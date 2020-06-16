@@ -20,10 +20,28 @@ int main(int argc, char * argv[])
   try
   {
     // Initialize the robot
-    franka::Robot robot(argv[1]);
+    std::unique_ptr<franka::Robot> robotPtr1;
+    std::unique_ptr<franka::Robot> robotPtr2;
+    robotPtr1.reset(new franka::Robot(argv[1]));
+    robotPtr1->setCollisionBehavior( //values taken from https://github.com/frankaemika/libfranka/blob/master/examples/generate_joint_velocity_motion.cpp#L39
+        {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
+        {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
+        {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}}, {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}},
+        {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}}, {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}});
+    if(argc == 3)
+    {
+      robotPtr2.reset(new franka::Robot(argv[2]));
+      // robotPtr2->setCollisionBehavior(); 
+    }
 
     // Get the initial state of the robot
-    auto state = robot.readOnce();
+    std::unique_ptr<franka::RobotState> statePtr1;
+    std::unique_ptr<franka::RobotState> statePtr2;
+    statePtr1.reset(new franka::RobotState(robotPtr1->readOnce()));
+    if(argc == 3)
+    {
+      statePtr2.reset(new franka::RobotState(robotPtr2->readOnce()));
+    }
 
     // Initialize mc_rtc
     mc_control::MCGlobalController controller;
@@ -31,31 +49,88 @@ int main(int argc, char * argv[])
     {
       LOG_ERROR_AND_THROW(std::runtime_error, "mc_rtc must be configured to run at 1kHz");
     }
+
     std::vector<double> initq;
-    for(size_t i = 0; i < state.q.size(); ++i)
+    std::vector<double> initdq;
+    if(controller.robot().refJointOrder().size() < statePtr1->q.size())
     {
-      initq.push_back(state.q[i]);
+      LOG_ERROR_AND_THROW(std::runtime_error, "mc_rtc-model has " << controller.robot().refJointOrder().size() << " joints, the real robot has " << statePtr1->q.size() << " joints");
     }
-    // FIXME Temporary work-around until we handle the gripper
-    while(controller.robot().refJointOrder().size() > initq.size())
+    for(size_t i = 0; i < statePtr1->q.size(); ++i)
     {
-      initq.push_back(0);
+      initq.push_back(statePtr1->q[i]);
+      initdq.push_back(statePtr1->dq[i]);
     }
+    if(argc == 3)
+    {
+      if(controller.robot().refJointOrder().size() < statePtr1->q.size()+statePtr2->q.size())
+      {
+        LOG_ERROR_AND_THROW(std::runtime_error, "mc_rtc-model has " << controller.robot().refJointOrder().size() << " joints, the real robot has " << statePtr1->q.size()+statePtr2->q.size() << " joints");
+      }
+      for(size_t i = 0; i < statePtr2->q.size(); ++i)
+      {
+        initq.push_back(statePtr2->q[i]);
+        initdq.push_back(statePtr2->dq[i]);
+      }
+    }
+
+    std::map<std::string, sva::ForceVecd> wrenches;
+    sva::ForceVecd wrench1 = sva::ForceVecd();
+    sva::ForceVecd wrench2 = sva::ForceVecd();
+    wrench1.force().x() = statePtr1->K_F_ext_hat_K[0]; //TODO use: statePtr1->K_F_ext_hat_K[] or statePtr1->O_F_ext_hat_K[] ?
+    wrench1.force().y() = statePtr1->K_F_ext_hat_K[1];
+    wrench1.force().z() = statePtr1->K_F_ext_hat_K[2];
+    wrench1.moment().x() = statePtr1->K_F_ext_hat_K[3];
+    wrench1.moment().y() = statePtr1->K_F_ext_hat_K[4];
+    wrench1.moment().z() = statePtr1->K_F_ext_hat_K[5];
+    wrenches.insert(std::make_pair("LeftHandForceSensor", wrench1));
+    if(argc == 3)
+    {
+      wrench2.force().x() = statePtr1->K_F_ext_hat_K[0]; //TODO use: statePtr1->K_F_ext_hat_K[] or statePtr1->O_F_ext_hat_K[] ?
+      wrench2.force().y() = statePtr1->K_F_ext_hat_K[1];
+      wrench2.force().z() = statePtr1->K_F_ext_hat_K[2];
+      wrench2.moment().x() = statePtr1->K_F_ext_hat_K[3];
+      wrench2.moment().y() = statePtr1->K_F_ext_hat_K[4];
+      wrench2.moment().z() = statePtr1->K_F_ext_hat_K[5];
+      wrenches.insert(std::make_pair("RightHandForceSensor", wrench2));
+    }
+    // // FIXME Temporary work-around until we handle the gripper
+    // if(controller.robot().refJointOrder().size() > initq.size())
+    // {
+    //   LOG_INFO("applying a temporary work-around")
+    //   while(controller.robot().refJointOrder().size() > initq.size())
+    //   {
+    //     initq.push_back(0);
+    //     initdq.push_back(0);
+    //   }
+    // }
     controller.init(initq);
+    controller.setWrenches(wrenches);
     controller.running = true;
 
     controller.controller().gui()->addElement({"Franka"},
                                               mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
 
     // Start the control loop
-    franka::JointPositions output(state.q);
-    robot.control([&controller,&initq,&output](const franka::RobotState & state, franka::Duration) -> franka::JointPositions
+    franka::JointPositions output(statePtr1->q);
+    franka::RobotState state1 = *statePtr1;
+    robotPtr1->control([&controller,&initq,&initdq,&wrenches,&output](const franka::RobotState & state1, franka::Duration) -> franka::JointPositions
                   {
-                    for(size_t i = 0; i < state.q.size(); ++i)
+                    for(size_t i = 0; i < state1.q.size(); ++i)
                     {
-                      initq[i] = state.q[i];
+                      initq[i] = state1.q[i];
+                      initdq[i] = state1.dq[i];
                     }
+                    wrenches.find("LeftHandForceSensor")->second.force().x() = state1.K_F_ext_hat_K[0]; //TODO use: state1->K_F_ext_hat_K[] or state1->0_F_ext_hat_K[] ?
+                    wrenches.find("LeftHandForceSensor")->second.force().y() = state1.K_F_ext_hat_K[1];
+                    wrenches.find("LeftHandForceSensor")->second.force().z() = state1.K_F_ext_hat_K[2];
+                    wrenches.find("LeftHandForceSensor")->second.moment().x() = state1.K_F_ext_hat_K[3];
+                    wrenches.find("LeftHandForceSensor")->second.moment().y() = state1.K_F_ext_hat_K[4];
+                    wrenches.find("LeftHandForceSensor")->second.moment().z() = state1.K_F_ext_hat_K[5];
                     controller.setEncoderValues(initq);
+                    controller.setEncoderVelocities(initdq);
+                    controller.setWrenches(wrenches);
+
                     if(controller.running && controller.run())
                     {
                       const auto & rjo = controller.robot().refJointOrder();
@@ -66,7 +141,7 @@ int main(int argc, char * argv[])
                       }
                       return output;
                     }
-                    output.q = state.q;
+                    output.q = state1.q;
                     return franka::MotionFinished(output);
                   });
   }
