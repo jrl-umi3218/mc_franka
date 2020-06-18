@@ -16,6 +16,9 @@ int main(int argc, char * argv[])
   }
   try
   {
+    LOG_INFO("Ok, let's start");
+
+     //setup variables ##########################################################
     std::vector<double> q_vector;
     std::vector<double> dq_vector;
     std::vector<double> tau_vector;
@@ -40,19 +43,36 @@ int main(int argc, char * argv[])
     double control_command_success_rate;
     int counter=0;
     bool ok;
+    LOG_INFO("setup variables done");
 
     //init ##########################################################
     std::string robName1 = "leftRobot";
     dof = 7;
-    char * ip1 = argv[1];
-    robos[robName1] = std::make_shared<Controller>(std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip1, research_interface::robot::kCommandPort),1, franka::RealtimeConfig::kEnforce));
+    // char * ip1 = argv[1];
+    std::string ip1(argv[1]);
+
+    // std::unique_ptr<franka::Network> n = std::make_unique<franka::Network>(ip1, research_interface::robot::kCommandPort);
+    // LOG_INFO("network created with ip: " << ip1);
+    // LOG_INFO("initializing " << robName1 << " with ip: " << ip1);
+    // std::unique_ptr<franka::Robot::Impl> test;
+    // test.reset(new franka::Robot::Impl(std::make_unique<franka::Network>(ip1, research_interface::robot::kCommandPort), 1, franka::RealtimeConfig::kEnforce));
+    // LOG_INFO("initializing " << robName1 << " with ip: " << ip1);
+    // std::unique_ptr<franka::Robot::Impl> test2 = std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip1, research_interface::robot::kCommandPort), 1, franka::RealtimeConfig::kEnforce);
+    // LOG_INFO("initializing " << robName1 << " with ip: " << ip1);
+
+    robos[robName1] = std::make_shared<Controller>(std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip1, research_interface::robot::kCommandPort), 1, franka::RealtimeConfig::kEnforce));
+    LOG_INFO("initialized " << robName1 << " with ip: " << ip1);
     if(argc == 3)
     {
       std::string robName2 = "rightRobot";
       dof = 14;
-      char * ip2 = argv[2];
-      robos[robName2] = std::make_shared<Controller>(std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip2, research_interface::robot::kCommandPort),1, franka::RealtimeConfig::kEnforce));
+      // char * ip2 = argv[2];
+      std::string ip2(argv[2]);
+      LOG_INFO("initializing " << robName2 << " with ip: " << ip2);
+      robos[robName2] = std::make_shared<Controller>(std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip2, research_interface::robot::kCommandPort), 1, franka::RealtimeConfig::kEnforce));
+      LOG_INFO("initialized " << robName2 << " with ip: " << ip2);
     }
+    LOG_INFO("init done");
 
     //setup mcrtc ##########################################################
     // InterfaceMCRTC mcrtc = InterfaceMCRTC(dof);
@@ -64,7 +84,7 @@ int main(int argc, char * argv[])
     mcrtcControl.running = true;
     mcrtcControl.controller().gui()->addElement({"Franka"},
                                               mc_rtc::gui::Button("Stop controller", [&mcrtcControl]() { mcrtcControl.running = false; }));
-
+    LOG_INFO("setup mcrtc done");
 
     //start libfranka ##########################################################
     counter=0;
@@ -77,7 +97,7 @@ int main(int argc, char * argv[])
         counter++;
       }
 
-      // ok = it->second->setControlMode("Position");
+      // ok = it->second->setControlMode("JointPositionCtrl");
       ok = it->second->start();
     }
     mcrtcControl.init(init_q_vector);
@@ -86,6 +106,7 @@ int main(int argc, char * argv[])
     {
       LOG_ERROR_AND_THROW(std::runtime_error, "mc_rtc-model has " << rjo.size() << " joints, the real robot system has " << dof << " joints");
     }
+    LOG_INFO("start libfranka done");
 
     //main loop ##########################################################
     while(true)

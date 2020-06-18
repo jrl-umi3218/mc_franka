@@ -58,7 +58,8 @@ class Controller {
         ControlModes current_control_mode = ControlModes::Position;
         uint32_t motion_id = 0;
         std::unique_ptr<franka::Model> franka_model;
-        std::unique_ptr<franka::RobotControl> franka_control;
+        // std::unique_ptr<franka::RobotControl> franka_control;
+        std::unique_ptr<franka::Robot::Impl> franka_control;
         franka::RobotState franka_state;
         franka::RobotState franka_stateInitial;
         research_interface::robot::MotionGeneratorCommand motion_command;
