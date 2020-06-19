@@ -12,11 +12,12 @@ include_directories(${Franka_INCLUDE_DIRS}
 #message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
 #message(STATUS "Franka_DIR: ${Franka_DIR}")
 #message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
-#message(STATUS "test: ${CMAKE_SOURCE_DIR}/../libfranka/common/include")
+#message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
 link_directories(${Franka_LIBRARY_DIRS})
 
-add_executable(MCFrankaControl src/MCFrankaControl.cpp src/Controller.hpp src/Controller.cpp src/InterfaceMCRTC.hpp src/InterfaceMCRTC.cpp)
-#target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka)
-target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control ${Franka_LIBRARIES} PocoNet) #PocoFoundation 
-
+add_executable(MCFrankaControl src/MCFrankaControl.cpp)
+add_executable(MCFrankaControlMulti src/MCFrankaControlMulti.cpp src/Controller.hpp src/Controller.cpp)
+target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka)
+target_link_libraries(MCFrankaControlMulti PUBLIC mc_rtc::mc_control ${Franka_LIBRARIES} PocoNet) #PocoFoundation 
 install(TARGETS MCFrankaControl DESTINATION bin)
+install(TARGETS MCFrankaControlMulti DESTINATION bin)

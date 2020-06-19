@@ -31,8 +31,10 @@
 #include <iostream>
 #include <string>
 
-enum ControlModes {Position, Velocity, Torque};
-static const std::map < ControlModes, std::string > ControlModeMap = 
+#define PANDA_DOF 7
+
+enum ControlMode {Position, Velocity, Torque};
+static const std::map < ControlMode, std::string > ControlModeMap = 
 {
   {Position, "JointPositionCtrl"}, 
   {Velocity, "JointVelocityCtrl"}, 
@@ -41,28 +43,28 @@ static const std::map < ControlModes, std::string > ControlModeMap =
 
 class Controller {
     public:
-        Controller(std::unique_ptr<franka::Robot::Impl> franka_control);
+        Controller(franka::Robot::Impl & frankaControl, const ControlMode controlMode);        
 
         ~Controller() {
         }
 
         franka::RobotState getInitialState();
-        std::string getControlMode();
-        bool setControlMode(const std::string &controlMode);
+        ControlMode getControlMode();
         bool start();
-        bool setCommand(std::array<double, 7> cmd);
-        double getState(std::array<double, 7> q, std::array<double, 7> dq, std::array<double, 7> tau, Eigen::Vector3d & force, Eigen::Vector3d & moment);
+        bool setCommand(std::array<double, PANDA_DOF> cmd);
+        double getState(std::array<double, PANDA_DOF> q, std::array<double, PANDA_DOF> dq, std::array<double, PANDA_DOF> tau, Eigen::Vector3d & force, Eigen::Vector3d & moment);
         bool stop();
 
     private:
-        ControlModes current_control_mode = ControlModes::Position;
-        uint32_t motion_id = 0;
-        std::unique_ptr<franka::Model> franka_model;
-        // std::unique_ptr<franka::RobotControl> franka_control;
-        std::unique_ptr<franka::Robot::Impl> franka_control;
-        franka::RobotState franka_state;
-        franka::RobotState franka_stateInitial;
-        research_interface::robot::MotionGeneratorCommand motion_command;
-        research_interface::robot::ControllerCommand control_command;
-        static constexpr research_interface::robot::Move::Deviation kDefaultDeviation {10.0, 3.12, 2 * M_PI};
+      bool setControlMode(const ControlMode controlMode);
+      ControlMode control_mode = ControlMode::Position;
+      uint32_t motion_id = 0;
+      std::unique_ptr<franka::Model> franka_model;
+      // std::unique_ptr<franka::RobotControl> franka_control;
+      franka::Robot::Impl & franka_control;
+      franka::RobotState franka_state;
+      franka::RobotState franka_stateInitial;
+      research_interface::robot::MotionGeneratorCommand motion_command;
+      research_interface::robot::ControllerCommand control_command;
+      static constexpr research_interface::robot::Move::Deviation kDefaultDeviation {10.0, 3.12, 2 * M_PI};
 };
