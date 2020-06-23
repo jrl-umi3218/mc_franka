@@ -16,9 +16,15 @@ int main(int argc, char * argv[])
   try
   {
     LOG_INFO("Ok, let's start");
+    LOG_INFO("argc = " << argc); //=number_of_pandas-1
+    for(int i=1; i<argc; i++)
+    {
+      LOG_INFO("argv[" << i <<"] = " << argv[i]); //e.g. 172.16.0.2, 172.16.1.2, ...
+    }
     // ControlMode controlMode = ControlMode::Position;
     ControlMode controlMode = ControlMode::Velocity;
     // ControlMode controlMode = ControlMode::Torque;
+
 
     //setup variables ##########################################################
     int total_dof = 0;
@@ -31,6 +37,13 @@ int main(int argc, char * argv[])
     std::array<double, PANDA_DOF> dq_array;
     std::array<double, PANDA_DOF> tau_array;
     std::array<double, PANDA_DOF> cmd_array;
+    for(size_t i = 0; i < PANDA_DOF; ++i)
+    {
+      q_array[i] = 0.0;
+      dq_array[i] = 0.0;
+      tau_array[i] = 0.0;
+      cmd_array[i] = 0.0;
+    }
     std::map<std::string, sva::ForceVecd> wrenches;
     sva::ForceVecd wrench = sva::ForceVecd(Eigen::Vector6d::Zero());
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
@@ -44,12 +57,11 @@ int main(int argc, char * argv[])
     bool ok;
     // LOG_INFO("setup variables done");
 
+
     //init ##########################################################
     std::string robName1 = "LeftHand";
     std::string ip1(argv[1]);
-    std::unique_ptr<franka::Robot::Impl> rob1;
-    rob1 = std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip1, research_interface::robot::kCommandPort), 0);
-    robos.insert(std::make_pair(robName1, std::make_shared<Controller>(*rob1, controlMode)));
+    robos.insert(std::make_pair(robName1, std::make_shared<Controller>(robName1, ip1, controlMode)));
     total_dof += PANDA_DOF;
     sensorname = "LeftHandForceSensor";
     wrenches.insert(std::make_pair(sensorname, wrench));
@@ -62,9 +74,7 @@ int main(int argc, char * argv[])
     {
       std::string robName2 = "RightHand";
       std::string ip2(argv[2]);
-      std::unique_ptr<franka::Robot::Impl> rob2;
-      rob2 = std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip2, research_interface::robot::kCommandPort), 0);
-      robos.insert(std::make_pair(robName2, std::make_shared<Controller>(*rob2, controlMode)));
+      robos.insert(std::make_pair(robName2, std::make_shared<Controller>(robName2, ip2, controlMode)));
       total_dof += PANDA_DOF;
       sensorname = "RightHandForceSensor";
       wrenches.insert(std::make_pair(sensorname, wrench));
@@ -74,13 +84,13 @@ int main(int argc, char * argv[])
       }
       LOG_INFO("initialized " << robName2 << " with ip: " << ip2);
     }
-
     init_q_vector.resize(total_dof);
     q_vector.resize(total_dof);
     dq_vector.resize(total_dof);
     tau_vector.resize(total_dof);
     cmd_vector.resize(total_dof);
     // LOG_INFO("init done");
+
 
     //setup mcrtc ##########################################################
     mc_control::MCGlobalController mcrtcControl;
@@ -90,9 +100,6 @@ int main(int argc, char * argv[])
     }
     mcrtcControl.running = true;
     mcrtcControl.controller().gui()->addElement({"Franka"}, mc_rtc::gui::Button("Stop controller", [&mcrtcControl]() { mcrtcControl.running = false; }));
-    LOG_INFO("setup mcrtc done");
-
-    //start libfranka ##########################################################
     counter=0;
     for (it = robos.begin(); it != robos.end(); it++)
     {
@@ -102,7 +109,6 @@ int main(int argc, char * argv[])
         init_q_vector.at(counter) = initState.q[i];
         counter++;
       }
-      ok = it->second->start();
     }
     mcrtcControl.init(init_q_vector);
     const std::vector<std::string> & rjo = mcrtcControl.robot().refJointOrder();
@@ -114,7 +120,26 @@ int main(int argc, char * argv[])
     {
       LOG_INFO("the robot system has " << total_dof << " joints");
     }
-    LOG_INFO("start libfranka done");
+    // LOG_INFO("setup mcrtc done");
+
+
+    //start libfranka ##########################################################
+    for (it = robos.begin(); it != robos.end(); it++)
+    {
+      ok = it->second->start();
+    }
+    // LOG_INFO("start libfranka done");
+
+
+    //main loop ##########################################################
+    //HACK: sending always zero commands!
+    while(true)
+    {
+      for (it = robos.begin(); it != robos.end(); it++)
+      {
+        ok = it->second->setCommand(cmd_array);
+      }
+    }
 
     //main loop ##########################################################
     while(true)

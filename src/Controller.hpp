@@ -43,7 +43,7 @@ static const std::map < ControlMode, std::string > ControlModeMap =
 
 class Controller {
     public:
-        Controller(franka::Robot::Impl & frankaControl, const ControlMode controlMode);        
+        Controller(const std::string & robName, const std::string & ip, const ControlMode & controlMode);        
 
         ~Controller() {
         }
@@ -57,11 +57,12 @@ class Controller {
 
     private:
       bool setControlMode(const ControlMode controlMode);
+      bool started = false;
+      std::string robname;
       ControlMode control_mode = ControlMode::Position;
       uint32_t motion_id = 0;
       std::unique_ptr<franka::Model> franka_model;
-      // std::unique_ptr<franka::RobotControl> franka_control;
-      franka::Robot::Impl & franka_control;
+      std::unique_ptr<franka::Robot::Impl> franka_control;
       franka::RobotState franka_state;
       franka::RobotState franka_stateInitial;
       research_interface::robot::MotionGeneratorCommand motion_command;

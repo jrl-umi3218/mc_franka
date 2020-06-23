@@ -2,22 +2,37 @@
 
 constexpr research_interface::robot::Move::Deviation Controller::kDefaultDeviation;
 
-Controller::Controller(franka::Robot::Impl & frankaControl, const ControlMode controlMode) : franka_control(frankaControl), control_mode(controlMode)
+Controller::Controller(const std::string & robName, const std::string & ip, const ControlMode & controlMode) : robname(robName), control_mode(controlMode)
 {
-  std::cout <<"start constructor" << std::endl;
-  franka_model = std::make_unique<franka::Model>(franka_control.loadModel());
-  std::cout <<"model loaded" << std::endl;
-  franka_stateInitial = franka_control.readOnce();
+  std::cout <<"start constructor " << robname << std::endl;
+  // franka_control = std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip, research_interface::robot::kCommandPort), 0); //TODO choosing which options?
+  franka_control = std::make_unique<franka::Robot::Impl>(std::make_unique<franka::Network>(ip, research_interface::robot::kCommandPort), 1, franka::RealtimeConfig::kEnforce);
+  if(franka_control == NULL)
+  {
+    std::cout << "franka_control is null for " << robname << std::endl;
+    throw;
+  }
+  std::cout << "controller created for " << robname << std::endl;
+  
+  franka_model = std::make_unique<franka::Model>(franka_control->loadModel());
+  if(franka_model == NULL)
+  {
+    std::cout << "franka_model is null for " << robname << std::endl;
+    throw;
+  }
+  std::cout << "model loaded for " << robname << std::endl;
+
+  franka_stateInitial = franka_control->readOnce();
   for(size_t i = 0; i < PANDA_DOF; ++i)
   {
     std::cout << "initial state " << i << ". joint position: " << franka_stateInitial.q[i] << std::endl;
   }
-  std::cout <<"initial stated loaded" << std::endl;
+  std::cout <<"initial stated loaded for " << robname << std::endl;
 
   // //TODO what about this part?
   // std::string franka_address = "";
   // std::unique_ptr<franka::Robot> robotPtr;
-  // robotPtr.reset(new franka::Robot(franka_address));
+  // robotPtr.reset(new franka::Robot172.16.0.2 (franka_address));
   // robotPtr->setJointImpedance({{100,100,100,100,100,100,100}}); //TODO which values to choose?
   // robotPtr->setCartesianImpedance({{100,100,100,10,10,10}}); //TODO which values to choose?
   // robotPtr->setCollisionBehavior( //values taken from https://github.com/frankaemika/libfranka/blob/master/examples/generate_joint_velocity_motion.cpp#L39
@@ -36,14 +51,14 @@ franka::RobotState Controller::getInitialState()
 
 ControlMode Controller::getControlMode()
 {
-  std::cout << "current control mode is: " << ControlModeMap.find(control_mode)->second << std::endl;
+  std::cout << "current control mode for " << robname << " is: " << ControlModeMap.find(control_mode)->second << std::endl;
   return control_mode;
 }
 
 
 bool Controller::setControlMode(const ControlMode controlMode)
 {
-  std::cout << "setControlMode" << std::endl;
+  std::cout << "setControlMode " << robname << std::endl;
   this->control_mode = controlMode;
   std::cout << "current control mode is: " << ControlModeMap.find(control_mode)->second << std::endl;
   std::cout << "setControlMode done" << std::endl;
@@ -53,38 +68,50 @@ bool Controller::setControlMode(const ControlMode controlMode)
 
 bool Controller::start()
 {
-  std::cout << "start" << std::endl;
+  std::cout << "start " << robname << std::endl;
+  if(started)
+  {
+    std::cout << "starting " << robname << " not possible, is already started in mode: " << ControlModeMap.find(control_mode)->second << std::endl;
+    return false;
+  }
+  if(franka_control == NULL)
+  {
+    std::cout << "franka_control is null for " << robname << std::endl;
+    return false;
+  }
+
   try 
   {
-    std::cout << "starting in mode: " << ControlModeMap.find(control_mode)->second << std::endl;
+    std::cout << "starting " << robname << " in mode: " << ControlModeMap.find(control_mode)->second << std::endl;
     switch (control_mode)
     {
       case ControlMode::Torque:
-        // motion_id = franka_control.startMotion(research_interface::robot::Move::ControllerMode::kExternalController, 
+        // motion_id = franka_control->startMotion(research_interface::robot::Move::ControllerMode::kExternalController, 
         //                                         franka::MotionGeneratorTraits<franka::JointVelocities>::kMotionGeneratorMode, 
         //                                         kDefaultDeviation, 
         //                                         kDefaultDeviation);
-        motion_id = franka_control.startMotion(research_interface::robot::Move::ControllerMode::kExternalController, 
+        motion_id = franka_control->startMotion(research_interface::robot::Move::ControllerMode::kExternalController, 
                                                 research_interface::robot::Move::MotionGeneratorMode::kJointVelocity,
                                                 kDefaultDeviation,
                                                 kDefaultDeviation);
         break;
       case ControlMode::Velocity:
-        // motion_id = franka_control.startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
+        // motion_id = franka_control->startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
         //                                         franka::MotionGeneratorTraits<franka::JointVelocities>::kMotionGeneratorMode, 
         //                                         kDefaultDeviation, 
         //                                         kDefaultDeviation);
-        motion_id = franka_control.startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
+        motion_id = franka_control->startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
                                                 research_interface::robot::Move::MotionGeneratorMode::kJointVelocity,
                                                 kDefaultDeviation,
                                                 kDefaultDeviation);
+        std::cout << "motion_id = " << motion_id << std::endl;
         break;
       case ControlMode::Position:
-        // motion_id = franka_control.startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
+        // motion_id = franka_control->startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
         //                                         franka::MotionGeneratorTraits<franka::JointPositions>::kMotionGeneratorMode, 
         //                                         kDefaultDeviation, 
         //                                         kDefaultDeviation);
-        motion_id = franka_control.startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
+        motion_id = franka_control->startMotion(research_interface::robot::Move::ControllerMode::kJointImpedance, 
                                                 research_interface::robot::Move::MotionGeneratorMode::kJointPosition,
                                                 kDefaultDeviation,
                                                 kDefaultDeviation);
@@ -104,6 +131,7 @@ bool Controller::start()
     std::cout <<"std::exception: "<<exc.what() << std::endl;
     throw;
   }
+  started = true;
   std::cout << "start done" << std::endl;
   return true;
 }
@@ -111,9 +139,14 @@ bool Controller::start()
 
 bool Controller::setCommand(std::array<double, PANDA_DOF> cmd)
 {
+  // std::cout << "setCommand " << robname << std::endl;
+  if(franka_control == NULL)
+  {
+    std::cout << "franka_control is null for " << robname << std::endl;
+    return false;
+  }
   try 
   {
-    // std::cout << "setCommand" << std::endl;
     motion_command.q_c.fill(0);
     motion_command.dq_c.fill(0);
     motion_command.O_T_EE_c.fill(0);
@@ -139,11 +172,11 @@ bool Controller::setCommand(std::array<double, PANDA_DOF> cmd)
 
     if(control_mode == ControlMode::Torque) 
     {
-      franka_state = franka_control.update(&motion_command, &control_command);
+      franka_state = franka_control->update(&motion_command, &control_command);
     } else {
-      franka_state = franka_control.update(&motion_command, nullptr);
+      franka_state = franka_control->update(&motion_command, nullptr);
     }
-    franka_control.throwOnMotionError(franka_state, motion_id);
+    franka_control->throwOnMotionError(franka_state, motion_id);
   } 
   catch (const franka::NetworkException &exc) 
   {
@@ -162,7 +195,7 @@ bool Controller::setCommand(std::array<double, PANDA_DOF> cmd)
 
 double Controller::getState(std::array<double, PANDA_DOF> q, std::array<double, PANDA_DOF> dq, std::array<double, PANDA_DOF> tau, Eigen::Vector3d & force, Eigen::Vector3d & moment)
 {
-  // std::cout << "getState" << std::endl;
+  // std::cout << "getState " << robname << std::endl;
   try
   {
     q = franka_state.q;
@@ -175,6 +208,11 @@ double Controller::getState(std::array<double, PANDA_DOF> q, std::array<double, 
     moment.y() = franka_state.K_F_ext_hat_K[4];
     moment.z() = franka_state.K_F_ext_hat_K[5];
 
+    // if(franka_model == NULL)
+    // {
+    //   std::cout << "franka_model is null for " << robname << std::endl;
+    //   return false;
+    // }
     // std::array<double, PANDA_DOF*PANDA_DOF> inertia_feedback = franka_model->mass(franka_state);
     // std::array<double, PANDA_DOF> coriolis_feedback = franka_model->coriolis(franka_state);
     // std::array<double, PANDA_DOF> gravity_feedback = franka_model->gravity(franka_state);
@@ -199,21 +237,26 @@ double Controller::getState(std::array<double, PANDA_DOF> q, std::array<double, 
 
 bool Controller::stop()
 {
-  std::cout << "stop" << std::endl;
+  std::cout << "stop " << robname << std::endl;
+  if(franka_control == NULL)
+  {
+    std::cout << "franka_control is null for " << robname << std::endl;
+    return false;
+  }
   try
   {
-    //franka_control.cancelMotion(motion_id);
+    //franka_control->cancelMotion(motion_id);
     if(control_mode == ControlMode::Torque) {
-      franka_control.finishMotion(motion_id, &motion_command, &control_command);
+      franka_control->finishMotion(motion_id, &motion_command, &control_command);
     } else {
-      franka_control.finishMotion(motion_id, &motion_command, nullptr);
+      franka_control->finishMotion(motion_id, &motion_command, nullptr);
     }
   } 
   catch (...) 
   {
     try 
     {
-      franka_control.cancelMotion(motion_id);
+      franka_control->cancelMotion(motion_id);
     } 
     catch (...) {}
     throw;
