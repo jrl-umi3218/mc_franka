@@ -156,13 +156,18 @@ int main(int argc, char * argv[])
 
                       int randomNumber = rand() % 1000 + 1; //generate number between 1 and 1000
                       if (randomNumber==1000){
-                        LOG_INFO("force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "]")
+                        LOG_INFO("force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "] and moment =[" << wrench.moment().x() << ", " << wrench.moment().y() << ", " << wrench.moment().z() << "]")
+                      }
+
+                      if(wrench.force().norm() > 30){
+                        LOG_ERROR("stopping because wrench.force().norm() = " << wrench.force().norm())
+                        return franka::MotionFinished(output_dq);
                       }
                       
                       controller.setEncoderValues(q_vector);
                       controller.setEncoderVelocities(dq_vector);
                       // controller.setJointTorques(tau_vector);
-                      // controller.setWrenches(wrenches);
+                      controller.setWrenches(wrenches);
                       if(controller.running && controller.run())
                       {
                         const auto & rjo = controller.robot().refJointOrder();
@@ -178,6 +183,8 @@ int main(int argc, char * argv[])
                     // }, franka::ControllerMode::kJointImpedance, true, 100); //default parameters
                     }, franka::ControllerMode::kJointImpedance, true, 1000); //increased kDefaultCutoffFrequency 
     }
+
+    robot.stop();
   }
   catch(const franka::Exception & e)
   {
