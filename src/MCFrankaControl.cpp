@@ -149,6 +149,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     {
       std::string ip = frankaConfig(robot.name())("ip");
       pandas.emplace_back(robot.name(), ip, n_steps);
+      pandas.back().init(controller);
     }
     else
     {
