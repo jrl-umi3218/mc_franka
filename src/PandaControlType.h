@@ -17,6 +17,7 @@ template<>
 struct PandaControlType<ControlMode::Position> : public franka::JointPositions
 {
   using ReturnT = franka::JointPositions;
+  using CallbackT = std::function<ReturnT(const franka::RobotState &, franka::Duration)>;
 
   PandaControlType(const franka::RobotState & state) : franka::JointPositions(state.q), prev_q_(state.q) {}
 
@@ -35,6 +36,11 @@ struct PandaControlType<ControlMode::Position> : public franka::JointPositions
     return *this;
   }
 
+  void control(franka::Robot & robot, CallbackT cb)
+  {
+    robot.control(cb, franka::ControllerMode::kJointImpedance, true, 100);
+  }
+
 private:
   std::array<double, 7> prev_q_;
 };
@@ -43,6 +49,7 @@ template<>
 struct PandaControlType<ControlMode::Velocity> : public franka::JointVelocities
 {
   using ReturnT = franka::JointVelocities;
+  using CallbackT = std::function<ReturnT(const franka::RobotState &, franka::Duration)>;
 
   PandaControlType(const franka::RobotState & state) : franka::JointVelocities(state.dq) {}
 
@@ -56,12 +63,18 @@ struct PandaControlType<ControlMode::Velocity> : public franka::JointVelocities
     }
     return *this;
   }
+
+  void control(franka::Robot & robot, CallbackT cb)
+  {
+    robot.control(cb, franka::ControllerMode::kJointImpedance, true, 100);
+  }
 };
 
 template<>
 struct PandaControlType<ControlMode::Torque> : public franka::Torques
 {
   using ReturnT = franka::Torques;
+  using CallbackT = std::function<ReturnT(const franka::RobotState &, franka::Duration)>;
 
   PandaControlType(const franka::RobotState & state) : franka::Torques(state.tau_J) {}
 
@@ -74,5 +87,10 @@ struct PandaControlType<ControlMode::Torque> : public franka::Torques
       tau_J[i] = mbc.jointTorque[robot.jointIndexByName(rjo[i])][0];
     }
     return *this;
+  }
+
+  void control(franka::Robot & robot, CallbackT cb)
+  {
+    robot.control(cb, true, 1000);
   }
 };

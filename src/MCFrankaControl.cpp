@@ -85,24 +85,25 @@ struct PandaControlLoop
 
   void control_thread(mc_control::MCGlobalController & controller)
   {
-    robot.control([ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
-                  typename PandaControlType<cm>::ReturnT {
-                    this->state = stateIn;
-                    sensor_id += 1;
-                    auto & robot = controller.controller().robots().robot(name);
-                    auto & real = controller.controller().realRobots().robot(name);
-                    if(sensor_id % steps == 0)
-                    {
-                      sensors_cv.notify_all();
-                      std::unique_lock<std::mutex> command_lock(command_mutex);
-                      command_cv.wait(command_lock);
-                    }
-                    if(controller.running)
-                    {
-                      return control.update(robot, command, sensor_id % steps, steps);
-                    }
-                    return franka::MotionFinished(control);
-                  });
+    control.control(robot,
+                    [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
+                    typename PandaControlType<cm>::ReturnT {
+                      this->state = stateIn;
+                      sensor_id += 1;
+                      auto & robot = controller.controller().robots().robot(name);
+                      auto & real = controller.controller().realRobots().robot(name);
+                      if(sensor_id % steps == 0)
+                      {
+                        sensors_cv.notify_all();
+                        std::unique_lock<std::mutex> command_lock(command_mutex);
+                        command_cv.wait(command_lock);
+                      }
+                      if(controller.running)
+                      {
+                        return control.update(robot, command, sensor_id % steps, steps);
+                      }
+                      return franka::MotionFinished(control);
+                    });
   }
 
   std::string name;
