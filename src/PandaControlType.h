@@ -66,7 +66,7 @@ struct PandaControlType<ControlMode::Velocity> : public franka::JointVelocities
 
   void control(franka::Robot & robot, CallbackT cb)
   {
-    robot.control(cb, franka::ControllerMode::kJointImpedance, true, 100);
+    robot.control(cb, franka::ControllerMode::kJointImpedance, true, 1000);
   }
 };
 
