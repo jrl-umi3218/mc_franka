@@ -21,14 +21,14 @@ struct PandaControlType<ControlMode::Position> : public franka::JointPositions
   PandaControlType(const franka::RobotState & state) : franka::JointPositions(state.q), prev_q_(state.q) {}
 
   // Interpolate control value from the data in a robot
-  franka::JointPositions update(const mc_rbdyn::Robot & robot, const rbd::MultiBodyConfig & mbc, size_t i, size_t N)
+  franka::JointPositions update(const mc_rbdyn::Robot & robot, const rbd::MultiBodyConfig & mbc, size_t iter, size_t N)
   {
     const auto & rjo = robot.refJointOrder();
     for(size_t i = 0; i < q.size(); ++i)
     {
-      q[i] = prev_q_[i] + (i + 1) * (mbc.q[robot.jointIndexByName(rjo[i])][0] - prev_q_[i]) / N;
+      q[i] = prev_q_[i] + (iter + 1) * (mbc.q[robot.jointIndexByName(rjo[i])][0] - prev_q_[i]) / N;
     }
-    if(i == N)
+    if(iter + 1 == N)
     {
       prev_q_ = q;
     }
