@@ -44,31 +44,31 @@ int main(int argc, char * argv[])
     controller.init(initq);
     controller.running = true;
 
-    controller.controller().gui()->addElement({"Franka"},
-                                              mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
+    controller.controller().gui()->addElement(
+        {"Franka"}, mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
 
     // Start the control loop
     franka::JointPositions output(state.q);
-    robot.control([&controller,&initq,&output](const franka::RobotState & state, franka::Duration) -> franka::JointPositions
-                  {
-                    for(size_t i = 0; i < state.q.size(); ++i)
-                    {
-                      initq[i] = state.q[i];
-                    }
-                    controller.setEncoderValues(initq);
-                    if(controller.running && controller.run())
-                    {
-                      const auto & rjo = controller.robot().refJointOrder();
-                      for(size_t i = 0; i < output.q.size(); ++i)
-                      {
-                        const auto & j = rjo[i];
-                        output.q[i] = controller.robot().mbc().q[controller.robot().jointIndexByName(j)][0];
-                      }
-                      return output;
-                    }
-                    output.q = state.q;
-                    return franka::MotionFinished(output);
-                  });
+    robot.control(
+        [&controller, &initq, &output](const franka::RobotState & state, franka::Duration) -> franka::JointPositions {
+          for(size_t i = 0; i < state.q.size(); ++i)
+          {
+            initq[i] = state.q[i];
+          }
+          controller.setEncoderValues(initq);
+          if(controller.running && controller.run())
+          {
+            const auto & rjo = controller.robot().refJointOrder();
+            for(size_t i = 0; i < output.q.size(); ++i)
+            {
+              const auto & j = rjo[i];
+              output.q[i] = controller.robot().mbc().q[controller.robot().jointIndexByName(j)][0];
+            }
+            return output;
+          }
+          output.q = state.q;
+          return franka::MotionFinished(output);
+        });
   }
   catch(const franka::Exception & e)
   {
