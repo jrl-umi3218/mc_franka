@@ -1,0 +1,8 @@
+# Sample configuration for a multi-robot connection
+Franka:
+  ControlMode: Velocity # Can be: Position/Velocity/Torque
+  panda_default: # Name of the robot in the controller
+    ip: 172.16.0.2 # IP associated to this robot
+  panda_2: # Name of the robot in the controller
+    ip: 172.16.1.2
+  ignored: [env/door, env/box] # Ignored actuated robot that are not controlled via libfranka
