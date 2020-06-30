@@ -26,7 +26,7 @@ struct PandaControlType<ControlMode::Position> : public franka::JointPositions
     const auto & rjo = robot.refJointOrder();
     for(size_t i = 0; i < q.size(); ++i)
     {
-      q[i] = prev_q_[i] + (i + 1) * mbc.q[robot.jointIndexByName(rjo[i])][0] / N;
+      q[i] = prev_q_[i] + (i + 1) * (mbc.q[robot.jointIndexByName(rjo[i])][0] - prev_q_[i]) / N;
     }
     if(i == N)
     {
