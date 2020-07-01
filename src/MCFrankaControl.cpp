@@ -135,7 +135,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     controller.realRobots().robotCopy(robots.robot(i));
   }
   // Initialize controlled panda robot
-  std::vector<PandaControlLoop<cm>> pandas;
+  std::vector<std::pair<PandaControlLoop<cm>, size_t>> pandas;
   for(auto & robot : robots)
   {
     if(robot.mb().nrDof() == 0)
@@ -149,14 +149,18 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     if(frankaConfig.has(robot.name()))
     {
       std::string ip = frankaConfig(robot.name())("ip");
-      pandas.emplace_back(robot.name(), ip, n_steps);
-      pandas.back().init(controller);
+      pandas.emplace_back(std::make_pair<PandaControlLoop<cm>, size_t>({robot.name(), ip, n_steps}, 0));
+      pandas.back().first.init(controller);
     }
     else
     {
       mc_rtc::log::warning("The loaded controller uses an actuated robot that is not configured and not ignored: {}",
                            robot.name());
     }
+  }
+  for(auto & panda : pandas)
+  {
+    controller.controller().logger().addLogEntry(panda.first.name + "_sensors_id", [&panda]() { return panda.second; });
   }
   controller.init(robots.robot().encoderValues());
   controller.running = true;
@@ -166,7 +170,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   std::vector<std::thread> panda_threads;
   for(auto & panda : pandas)
   {
-    panda_threads.emplace_back([&panda, &controller]() { panda.control_thread(controller); });
+    panda_threads.emplace_back([&panda, &controller]() { panda.first.control_thread(controller); });
   }
   size_t iter = 0;
   while(controller.running)
@@ -183,7 +187,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
         }
         for(const auto & panda : pandas)
         {
-          if(panda.sensor_id % n_steps != 0)
+          if(panda.first.sensor_id % n_steps != 0 || panda.first.sensor_id == panda.second)
           {
             return false;
           }
@@ -197,7 +201,8 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       }
       for(auto & panda : pandas)
       {
-        panda.updateSensors(controller);
+        panda.first.updateSensors(controller);
+        panda.second = panda.first.sensor_id;
       }
       command_cv.notify_all();
     }
