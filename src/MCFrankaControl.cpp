@@ -135,7 +135,6 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     controller.realRobots().robotCopy(robots.robot(i));
     controller.realRobots().robots().back().name(robots.robot(i).name());
   }
-  std::exit(1);
   // Initialize controlled panda robot
   std::vector<std::pair<PandaControlLoop<cm>, size_t>> pandas;
   for(auto & robot : robots)
