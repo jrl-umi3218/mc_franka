@@ -17,7 +17,7 @@ link_directories(${Franka_LIBRARY_DIRS})
 
 add_executable(PrintPandaState src/PrintPandaState.cpp)
 add_executable(TestCobotPump src/TestCobotPump.cpp)
-add_executable(GravComp src/GravComp.cpp src/examples_common.h src/examples_common.cpp)
+add_executable(GravComp src/GravComp.cpp)
 add_executable(MCFrankaControl src/MCFrankaControl.cpp)
 add_executable(MCFrankaControlMulti src/MCFrankaControlMulti.cpp src/Controller.hpp src/Controller.cpp)
 add_executable(MCFrankaControlTest src/MCFrankaControlMultiTest.cpp)

@@ -9,13 +9,14 @@
 #include <mutex>
 #include <thread>
 
+#include <Eigen/Core>
+#include <Eigen/Eigen>
+
 #include <franka/duration.h>
 #include <franka/exception.h>
 #include <franka/model.h>
 #include <franka/rate_limiting.h>
 #include <franka/robot.h>
-
-#include "examples_common.h"
 
 namespace {
 template <class T, size_t N>
@@ -28,15 +29,6 @@ std::ostream& operator<<(std::ostream& ostream, const std::array<T, N>& array) {
 }
 }  // anonymous namespace
 
-/**
- * @example joint_impedance_control.cpp
- * An example showing a joint impedance type control that executes a Cartesian motion in the shape
- * of a circle. The example illustrates how to use the internal inverse kinematics to map a
- * Cartesian trajectory to joint space. The joint space target is tracked by an impedance control
- * that additionally compensates coriolis terms using the libfranka model library. This example
- * also serves to compare commanded vs. measured torques. The results are printed from a separate
- * thread to avoid blocking print functions in the real-time loop.
- */
 
 int main(int argc, char** argv) {
   // Check whether the required arguments were passed.
@@ -44,17 +36,6 @@ int main(int argc, char** argv) {
     std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << std::endl;
     return -1;
   }
-  // Set and initialize trajectory parameters.
-  const double radius = 0.05;
-  const double vel_max = 0.25;
-  const double acceleration_time = 2.0;
-  const double run_time = 20.0;
-  // Set print rate for comparing commanded vs. measured torques.
-  const double print_rate = 10.0;
-
-  double vel_current = 0.0;
-  double angle = 0.0;
-  double time = 0.0;
 
   // Initialize data fields for the print thread.
   struct {
@@ -65,9 +46,10 @@ int main(int argc, char** argv) {
     std::array<double, 7> tau_d_last;
     std::array<double, 7> gravity;
     std::array<double, 7> coriolis;
+    std::array<double, 42> jacobian_array;
   } print_data{};
   std::atomic_bool running{true};
-
+  const double print_rate = 10.0;
   // Start print thread.
   std::thread print_thread([print_rate, &print_data, &running]() {
     while (running) {
@@ -88,12 +70,36 @@ int main(int argc, char** argv) {
           // }
           // error_rms = std::sqrt(error_rms);
 
+          const Eigen::Matrix<double, 6, 7> jacobian(print_data.jacobian_array.data());
+          Eigen::JacobiSVD<Eigen::Matrix<double, 6, 7>> svd = Eigen::JacobiSVD<Eigen::Matrix<double, 6, 7>>();
+          svd.compute(jacobian); //critical singular value threshold is 0.08
+
+          const Eigen::Matrix<double, 7, 1> mytorques(print_data.robot_state.tau_ext_hat_filtered.data());
+          const Eigen::MatrixXd jacobianPinv = ( jacobian * jacobian.transpose() ).inverse() * jacobian;
+          const Eigen::VectorXd mywrench = jacobianPinv * mytorques;
+
+          // Eigen::CompleteOrthogonalDecomposition<Eigen::Matrix<double, 7, 6>> od = Eigen::CompleteOrthogonalDecomposition<Eigen::Matrix<double, 7, 6>>(jacobian.transpose());
+          // const Eigen::MatrixXd jacobianPinv2 = (od.pseudoInverse()).transpose();
+          // const Eigen::VectorXd mywrench2 = jacobianPinv2 * mytorques; //od.solve(mytorques);
+
+          Eigen::FullPivLU<Eigen::Matrix<double, 6, 6>> lu_decomp_ = Eigen::FullPivLU<Eigen::Matrix<double, 6, 6>>();
+          lu_decomp_.compute( jacobian * jacobian.transpose() );
+          const Eigen::MatrixXd jacobianPinv2 = lu_decomp_.inverse() * jacobian;
+          const Eigen::VectorXd mywrench2 = jacobianPinv2 * mytorques;
+
+
           // Print data to console
           std::cout << "control_command_success_rate: " <<  print_data.robot_state.control_command_success_rate << std::endl
                     << "joint configuration: " <<  print_data.robot_state.q << std::endl
+                    // << "jacobian: \n" << jacobian << std::endl
+                    // << "jacobianPinv: \n" << jacobianPinv << std::endl
+                    // << "jacobianPinv: \n" << jacobianPinv2 << std::endl
+                    << "jacobian-singularValues: " << svd.singularValues().transpose() << std::endl
                     << "External torque, filtered: " <<  print_data.robot_state.tau_ext_hat_filtered << std::endl
-                    << "end-effector wrench (base frame): " <<  print_data.robot_state.K_F_ext_hat_K << std::endl
+                    // << "end-effector wrench (base frame)     : " <<  print_data.robot_state.K_F_ext_hat_K << std::endl
                     << "end-effector wrench (stiffness frame): " <<  print_data.robot_state.O_F_ext_hat_K << std::endl
+                    << "end-effector wrench (stiffness frame): " <<  mywrench.transpose() << std::endl
+                    << "end-effector wrench (stiffness frame): " <<  mywrench2.transpose() << std::endl
                     // << "tau_error [Nm]: " << tau_error << std::endl
                     // << "tau_commanded [Nm]: " << tau_d_actual << std::endl
                     // << "tau_measured [Nm]: " << print_data.robot_state.tau_J << std::endl
@@ -109,7 +115,10 @@ int main(int argc, char** argv) {
 
   try {
     franka::Robot robot(argv[1]);
-    setDefaultBehavior(robot);
+    robot.setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}}); //values taken from https://github.com/frankaemika/libfranka/blob/master/examples/examples_common.cpp#L18
+    robot.setCartesianImpedance({{3000, 3000, 3000, 300, 300, 300}}); //values taken from https://github.com/frankaemika/libfranka/blob/master/examples/examples_common.cpp#L19
+    // robot.setJointImpedance({{100,100,100,100,100,100,100}}); 
+    // robot.setCartesianImpedance({{100,100,100,10,10,10}});
     robot.setCollisionBehavior(
         {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
         {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
@@ -136,8 +145,9 @@ int main(int argc, char** argv) {
             [&print_data, &model, d_gains](
                 const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
 
-      std::array<double, 7> gravity = model.gravity(state);
-      std::array<double, 7> coriolis = model.coriolis(state);
+      const std::array<double, 7> gravity = model.gravity(state);
+      const std::array<double, 7> coriolis = model.coriolis(state);
+      const std::array<double, 42> jacobian_array = model.zeroJacobian(franka::Frame::kEndEffector, state);
 
       // Compute torque command
       std::array<double, 7> tau_d_calculated;
@@ -159,6 +169,7 @@ int main(int argc, char** argv) {
         print_data.tau_d_last = tau_d_rate_limited;
         print_data.gravity = gravity;
         print_data.coriolis = coriolis;
+        print_data.jacobian_array = jacobian_array;
         print_data.mutex.unlock();
       }
 
