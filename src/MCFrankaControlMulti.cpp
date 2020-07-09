@@ -132,14 +132,14 @@ int main(int argc, char * argv[])
 
 
     //main loop ##########################################################
-    //HACK: sending always zero commands!
-    while(true)
-    {
-      for (it = robos.begin(); it != robos.end(); it++)
-      {
-        ok = it->second->setCommand(cmd_array);
-      }
-    }
+    // //HACK: sending always zero commands!
+    // while(true)
+    // {
+    //   for (it = robos.begin(); it != robos.end(); it++)
+    //   {
+    //     ok = it->second->setCommand(cmd_array);
+    //   }
+    // }
 
     //main loop ##########################################################
     while(true)
