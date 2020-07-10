@@ -87,7 +87,7 @@ int main(int argc, char * argv[])
     {
       LOG_ERROR_AND_THROW(std::runtime_error, "mc_rtc must be configured to run at 1kHz");
     }
-    sva::ForceVecd wrench = sva::ForceVecd(Eigen::Vector6d());
+    sva::ForceVecd wrench = sva::ForceVecd(Eigen::Vector6d::Zero());
     std::map<std::string, sva::ForceVecd> wrenches;
     wrenches.insert(std::make_pair("LeftHandForceSensor", wrench));
     std::vector<double> init_q_vector;
@@ -101,6 +101,9 @@ int main(int argc, char * argv[])
     for(size_t i = 0; i < dof; ++i)
     {
       init_q_vector.at(i)=state.q[i];
+      q_vector.at(i)=state.q[i];
+      dq_vector.at(i)=state.dq[i];
+      tau_vector.at(i)=state.tau_J[i];
     }
     // FIXME Temporary work-around until we handle the gripper
     int counter=dof-1;
@@ -109,6 +112,10 @@ int main(int argc, char * argv[])
       counter++;
       init_q_vector.at(counter)=0;
     }
+    controller.setEncoderValues(q_vector);
+    controller.setEncoderVelocities(dq_vector);
+    controller.setJointTorques(tau_vector);
+    controller.setWrenches(wrenches);
     controller.init(init_q_vector);
     controller.running = true;
 
