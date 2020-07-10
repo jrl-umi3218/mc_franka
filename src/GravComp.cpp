@@ -69,37 +69,57 @@ int main(int argc, char** argv) {
           //   error_rms += std::pow(tau_error[i], 2.0) / tau_error.size();
           // }
           // error_rms = std::sqrt(error_rms);
-
-          const Eigen::Matrix<double, 6, 7> jacobian(print_data.jacobian_array.data());
-          Eigen::JacobiSVD<Eigen::Matrix<double, 6, 7>> svd = Eigen::JacobiSVD<Eigen::Matrix<double, 6, 7>>();
-          svd.compute(jacobian); //critical singular value threshold is 0.08
-
           const Eigen::Matrix<double, 7, 1> mytorques(print_data.robot_state.tau_ext_hat_filtered.data());
-          const Eigen::MatrixXd jacobianPinv = ( jacobian * jacobian.transpose() ).inverse() * jacobian;
-          const Eigen::VectorXd mywrench = jacobianPinv * mytorques;
+          const Eigen::Matrix<double, 6, 7> jacobian(print_data.jacobian_array.data());
 
-          // Eigen::CompleteOrthogonalDecomposition<Eigen::Matrix<double, 7, 6>> od = Eigen::CompleteOrthogonalDecomposition<Eigen::Matrix<double, 7, 6>>(jacobian.transpose());
-          // const Eigen::MatrixXd jacobianPinv2 = (od.pseudoInverse()).transpose();
-          // const Eigen::VectorXd mywrench2 = jacobianPinv2 * mytorques; //od.solve(mytorques);
+          const Eigen::MatrixXd jacobianPinv1 = ( jacobian * jacobian.transpose() ).inverse() * jacobian;
+          const Eigen::VectorXd mywrench1= jacobianPinv1 * mytorques;
 
           Eigen::FullPivLU<Eigen::Matrix<double, 6, 6>> lu_decomp_ = Eigen::FullPivLU<Eigen::Matrix<double, 6, 6>>();
           lu_decomp_.compute( jacobian * jacobian.transpose() );
           const Eigen::MatrixXd jacobianPinv2 = lu_decomp_.inverse() * jacobian;
           const Eigen::VectorXd mywrench2 = jacobianPinv2 * mytorques;
 
+          Eigen::JacobiSVD<Eigen::Matrix<double, 7, 6>> svdT = Eigen::JacobiSVD<Eigen::Matrix<double, 7, 6>>();
+          svdT.setThreshold(0.08); //critical singular value threshold is 0.08
+          svdT.compute(jacobian.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
+          const Eigen::VectorXd mywrench3 = svdT.solve(mytorques);
+
+          const Eigen::MatrixXd U = svdT.matrixU();
+          const Eigen::MatrixXd V = svdT.matrixV();
+          const Eigen::VectorXd Svec  = svdT.singularValues();
+          Eigen::Matrix<double, 6, 6> S = Eigen::Matrix<double, 6, 6>::Zero();
+          S.diagonal() = Svec;
+          Eigen::Matrix<double, 6, 6> Sinv = Eigen::Matrix<double, 6, 6>::Zero();
+          // Sinv = S.inverse();
+          for(int i=0; i<6; i++){
+            if (Svec(i)>=0.08){
+              Sinv(i,i) = 1.0 / Svec(i);
+            }
+          }
+          const Eigen::MatrixXd jacobianPinv4 = V * Sinv * U.transpose();
+          const Eigen::VectorXd mywrench4 = jacobianPinv4 * mytorques;
+
 
           // Print data to console
           std::cout << "control_command_success_rate: " <<  print_data.robot_state.control_command_success_rate << std::endl
                     << "joint configuration: " <<  print_data.robot_state.q << std::endl
                     // << "jacobian: \n" << jacobian << std::endl
-                    // << "jacobianPinv: \n" << jacobianPinv << std::endl
-                    // << "jacobianPinv: \n" << jacobianPinv2 << std::endl
-                    << "jacobian-singularValues: " << svd.singularValues().transpose() << std::endl
+                    // << "U: \n" << U << std::endl
+                    // << "V: \n" << V << std::endl
+                    // << "S: \n" << S << std::endl
+                    // << "Sinv: \n" << Sinv << std::endl
+                    // << "jacobianPinv: \n" << jacobianPinv1.row(0) << std::endl
+                    // << "jacobianPinv: \n" << jacobianPinv2.row(0) << std::endl
+                    // << "jacobianPinv: \n" << jacobianPinv4.row(0) << std::endl
+                    // << "jacobian-singularValues: " << svdT.singularValues().transpose() << std::endl
                     << "External torque, filtered: " <<  print_data.robot_state.tau_ext_hat_filtered << std::endl
                     // << "end-effector wrench (base frame)     : " <<  print_data.robot_state.K_F_ext_hat_K << std::endl
                     << "end-effector wrench (stiffness frame): " <<  print_data.robot_state.O_F_ext_hat_K << std::endl
-                    << "end-effector wrench (stiffness frame): " <<  mywrench.transpose() << std::endl
+                    << "end-effector wrench (stiffness frame): " <<  mywrench1.transpose() << std::endl
                     << "end-effector wrench (stiffness frame): " <<  mywrench2.transpose() << std::endl
+                    << "end-effector wrench (stiffness frame): " <<  mywrench3.transpose() << std::endl
+                    << "end-effector wrench (stiffness frame): " <<  mywrench4.transpose() << std::endl
                     // << "tau_error [Nm]: " << tau_error << std::endl
                     // << "tau_commanded [Nm]: " << tau_d_actual << std::endl
                     // << "tau_measured [Nm]: " << print_data.robot_state.tau_J << std::endl

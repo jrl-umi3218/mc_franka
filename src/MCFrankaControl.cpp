@@ -143,7 +143,22 @@ int main(int argc, char * argv[])
         const std::array<double, 42> jacobian_array = model.zeroJacobian(franka::Frame::kEndEffector, state);
         const Eigen::Matrix<double, 6, 7> jacobian(jacobian_array.data());
         const Eigen::Matrix<double, 7, 1> torques(state.tau_ext_hat_filtered.data());
-        const Eigen::VectorXd wrench_vector = ( jacobian * jacobian.transpose() ).inverse() * jacobian * torques;
+
+        Eigen::JacobiSVD<Eigen::Matrix<double, 7, 6>> svdT = Eigen::JacobiSVD<Eigen::Matrix<double, 7, 6>>();
+        svdT.compute(jacobian.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
+        // const Eigen::VectorXd wrench_vector = svdT.solve(torques); //this solution maybe faster, but does not correspond to the libfranka wrenches for full-rank Jacobian
+        const Eigen::MatrixXd U = svdT.matrixU();
+        const Eigen::MatrixXd V = svdT.matrixV();
+        const Eigen::VectorXd Svec  = svdT.singularValues();
+        Eigen::Matrix<double, 6, 6> Sinv = Eigen::Matrix<double, 6, 6>::Zero();
+        for(int i=0; i<6; i++){
+          if (Svec(i)>=0.08) //important threshold, identical to the libfranka threshold!
+          {
+            Sinv(i,i) = 1.0 / Svec(i);
+          }
+        }
+        const Eigen::VectorXd wrench_vector = V * Sinv * U.transpose() * torques;
+
         wrench.force() = wrench_vector.head<3>();
         wrench.moment() = wrench_vector.tail<3>();
         // LOG_SUCCESS("special force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "] and moment =[" << wrench.moment().x() << ", " << wrench.moment().y() << ", " << wrench.moment().z() << "]")
