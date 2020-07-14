@@ -3,8 +3,11 @@
 #include <franka/exception.h>
 #include <franka/robot.h>
 #include <franka/model.h>
-
+#include <franka/vacuum_gripper.h>
 #include <iostream>
+
+// mc_panda
+#include <mc_panda/devices/Pump.h>
 
 namespace {
 template <class T, size_t N>
@@ -118,16 +121,43 @@ int main(int argc, char * argv[])
     controller.setWrenches(wrenches);
     controller.init(init_q_vector);
     controller.running = true;
-
     controller.controller().gui()->addElement({"Franka"},
                                               mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
 
+    // Initialize the libfranka VacuumGripper as 'sucker' and the mc_panda Pump as 'pump' if the robot-module has such a device
+    bool pumpAvailable = false;
+    std::shared_ptr<franka::VacuumGripper> sucker;
+    std::shared_ptr<mc_panda::Pump> pump;
+    try{
+      sucker = std::make_shared<franka::VacuumGripper>( franka::VacuumGripper(argv[1]) );
+      // franka::VacuumGripper sucker = franka::VacuumGripper(argv[1]);
+      mc_rtc::log::info("Connection established to VacuumGripper via {}", argv[1]);
+      
+      std::string pumpDeviceName = "Pump";
+      if(controller.robot().hasDevice<mc_panda::Pump>(pumpDeviceName))
+      {
+        pump = std::make_shared<mc_panda::Pump>( controller.robot().device<mc_panda::Pump>(pumpDeviceName) );
+        // mc_panda::Pump pump = controller.robot().device<mc_panda::Pump>(pumpDeviceName);
+        pumpAvailable = true;
+        mc_rtc::log::info("RobotModule has a Pump named {}", pumpDeviceName);
+      }
+      else{
+        mc_rtc::log::warning("RobotModule does not have a Pump named {}", pumpDeviceName);
+        mc_rtc::log::warning("Pump functionality will not be available");
+      }
+    }
+    catch(const franka::NetworkException & e)
+    {
+      mc_rtc::log::warning("Cannot connect to VacuumGripper via {}", argv[1]);
+      mc_rtc::log::warning("Pump functionality will not be available");
+    }
+    pumpAvailable = false; //TODO THIS IS A HACK
 
     // Start the control loop in velocity-control
     bool is_singular = false;;
     franka::Model model = robot.loadModel();
     franka::JointVelocities output_dq(state.dq);
-    robot.control([&print_data,&model,&controller,&q_vector,&dq_vector,&tau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
+    robot.control([&print_data,&model,&controller,&sucker,&pump,&pumpAvailable,&q_vector,&dq_vector,&tau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
     {
       for(size_t i = 0; i < state.q.size(); ++i)
       {
@@ -188,8 +218,50 @@ int main(int argc, char * argv[])
       controller.setEncoderVelocities(dq_vector);
       controller.setJointTorques(tau_vector);
       controller.setWrenches(wrenches);
+      if(pumpAvailable)
+      {
+        const franka::VacuumGripperState stateSucker = sucker->readOnce();
+        pump->set_in_control_range(stateSucker.in_control_range);
+        pump->set_part_detached(stateSucker.part_detached);
+        pump->set_part_present(stateSucker.part_present);
+        if(stateSucker.device_status==franka::VacuumGripperDeviceStatus::kGreen){
+          pump->set_device_status_ok(true);
+        }
+        else{
+          pump->set_device_status_ok(false);
+        }
+        pump->set_actual_power(stateSucker.actual_power);
+        pump->set_vacuum(stateSucker.vacuum);
+      }
+
       if(controller.running && controller.run())
       {
+        if(pumpAvailable)
+        {
+          if(pump->vacuumCommandRequested())
+          {
+            uint8_t vacuum;
+            std::chrono::milliseconds timeout;
+            pump->getVacuumCommandParams(vacuum, timeout);
+            bool vacuumOK = sucker->vacuum(vacuum, timeout);
+            pump->setVacuumCommandResult(vacuumOK);
+            mc_rtc::log::info("vacuum command applied with the params vacuum {} and timeout {}, result: {}", std::to_string(vacuum), std::to_string(timeout.count()), vacuumOK);
+          }
+          if(pump->dropoffCommandRequested())
+          {
+            std::chrono::milliseconds timeout;
+            pump->getDropoffCommandParam(timeout);
+            bool dropoffOK = sucker->dropOff(timeout);
+            pump->setDropoffCommandResult(dropoffOK);
+            mc_rtc::log::info("dropoff command applied with the param timeout {}, result: {}", std::to_string(timeout.count()), dropoffOK);
+          }
+          if(pump->stopCommandRequested())
+          {
+            bool stopOK = sucker->stop();
+            pump->setStopCommandResult(stopOK);
+            mc_rtc::log::info("stop command applied, result: {}", stopOK);
+          }
+        }
         const auto & rjo = controller.robot().refJointOrder();
         for(size_t i = 0; i < output_dq.dq.size(); ++i)
         {
