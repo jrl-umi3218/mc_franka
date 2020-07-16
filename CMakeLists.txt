@@ -2,10 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 
 project(mc_franka LANGUAGES CXX VERSION 1.0.0)
 
-find_package(mc_rtc REQUIRED)
-#find_package(mc_panda REQUIRED) #TODO
-set(mc_panda_DIR: /usr/local/lib/cmake/mc_panda) #TODO
-set(mc_panda_INCLUDE_DIRS: /usr/local/include) #TODO
+find_package(mc_rtc 1.4.0 REQUIRED)
 find_package(Franka REQUIRED)
 get_target_property(Franka_INCLUDE_DIRS ${Franka_LIBRARIES} INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(${Franka_INCLUDE_DIRS}
@@ -17,6 +14,7 @@ message(STATUS "Franka_DIR: ${Franka_DIR}")
 message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
 message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
 link_directories(${Franka_LIBRARY_DIRS})
+find_package(mc_panda REQUIRED)
 
 add_executable(PrintPandaState src/PrintPandaState.cpp)
 add_executable(TestCobotPump src/TestCobotPump.cpp)
@@ -28,7 +26,7 @@ add_executable(MCFrankaControlTest src/MCFrankaControlMultiTest.cpp)
 target_link_libraries(PrintPandaState PUBLIC mc_rtc::mc_control Franka::Franka)
 target_link_libraries(TestCobotPump PUBLIC mc_rtc::mc_control Franka::Franka)
 target_link_libraries(GravComp PUBLIC mc_rtc::mc_control Franka::Franka)
-target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka)
+target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka mc_panda::devices)
 target_link_libraries(MCFrankaTorqueControl PUBLIC mc_rtc::mc_control Franka::Franka)
 target_link_libraries(MCFrankaControlMulti PUBLIC mc_rtc::mc_control ${Franka_LIBRARIES} PocoNet) #PocoFoundation 
 target_link_libraries(MCFrankaControlTest PUBLIC mc_rtc::mc_control ${Franka_LIBRARIES} PocoNet) #PocoFoundation 
