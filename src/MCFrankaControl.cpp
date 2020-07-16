@@ -8,6 +8,7 @@
 
 // mc_panda
 #include <mc_panda/devices/Pump.h>
+#include <mc_panda/devices/PandaSensor.h>
 
 namespace {
 template <class T, size_t N>
@@ -124,20 +125,34 @@ int main(int argc, char * argv[])
     controller.controller().gui()->addElement({"Franka"},
                                               mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
 
+    // Initialize the the mc_panda PandaSensor as 'sensor' if the robot-module has such a device
+    bool sensorAvailable = false;
+    std::shared_ptr<mc_panda::PandaSensor> sensor;
+    std::string sensorDeviceName = "PandaSensor";
+    if(controller.robot().hasDevice<mc_panda::PandaSensor>(sensorDeviceName))
+    {
+      sensor = std::make_shared<mc_panda::PandaSensor>( controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName) );
+      sensorAvailable = true;
+      mc_rtc::log::info("RobotModule has a PandaSensor named {}", sensorDeviceName);
+    }
+    else{
+      mc_rtc::log::warning("RobotModule does not have a PandaSensor named {}", sensorDeviceName);
+      mc_rtc::log::warning("PandaSensor functionality will not be available");
+    }
+    sensorAvailable = false; //TODO THIS IS A HACK
+    
     // Initialize the libfranka VacuumGripper as 'sucker' and the mc_panda Pump as 'pump' if the robot-module has such a device
     bool pumpAvailable = false;
     std::shared_ptr<franka::VacuumGripper> sucker;
     std::shared_ptr<mc_panda::Pump> pump;
     try{
       sucker = std::make_shared<franka::VacuumGripper>( franka::VacuumGripper(argv[1]) );
-      // franka::VacuumGripper sucker = franka::VacuumGripper(argv[1]);
       mc_rtc::log::info("Connection established to VacuumGripper via {}", argv[1]);
       
       std::string pumpDeviceName = "Pump";
       if(controller.robot().hasDevice<mc_panda::Pump>(pumpDeviceName))
       {
         pump = std::make_shared<mc_panda::Pump>( controller.robot().device<mc_panda::Pump>(pumpDeviceName) );
-        // mc_panda::Pump pump = controller.robot().device<mc_panda::Pump>(pumpDeviceName);
         pumpAvailable = true;
         mc_rtc::log::info("RobotModule has a Pump named {}", pumpDeviceName);
       }
@@ -157,7 +172,7 @@ int main(int argc, char * argv[])
     bool is_singular = false;;
     franka::Model model = robot.loadModel();
     franka::JointVelocities output_dq(state.dq);
-    robot.control([&print_data,&model,&controller,&sucker,&pump,&pumpAvailable,&q_vector,&dq_vector,&tau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
+    robot.control([&print_data,&model,&controller,&sucker,&pump,&pumpAvailable,&sensor,&sensorAvailable,&q_vector,&dq_vector,&tau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
     {
       for(size_t i = 0; i < state.q.size(); ++i)
       {
@@ -218,6 +233,12 @@ int main(int argc, char * argv[])
       controller.setEncoderVelocities(dq_vector);
       controller.setJointTorques(tau_vector);
       controller.setWrenches(wrenches);
+      if(sensorAvailable)
+      {
+        const franka::VacuumGripperState stateSucker = sucker->readOnce();
+        sensor->set_tau_ext_hat_filtered(state.tau_ext_hat_filtered);
+        sensor->set_O_F_ext_hat_K(state.O_F_ext_hat_K);
+      }
       if(pumpAvailable)
       {
         const franka::VacuumGripperState stateSucker = sucker->readOnce();
@@ -262,6 +283,7 @@ int main(int argc, char * argv[])
             mc_rtc::log::info("stop command applied, result: {}", stopOK);
           }
         }
+
         const auto & rjo = controller.robot().refJointOrder();
         for(size_t i = 0; i < output_dq.dq.size(); ++i)
         {
