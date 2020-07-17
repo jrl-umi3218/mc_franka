@@ -238,6 +238,7 @@ int main(int argc, char * argv[])
         const franka::VacuumGripperState stateSucker = sucker->readOnce();
         sensor->set_tau_ext_hat_filtered(state.tau_ext_hat_filtered);
         sensor->set_O_F_ext_hat_K(state.O_F_ext_hat_K);
+        sensor->set_control_command_success_rate(state.control_command_success_rate);
       }
       if(pumpAvailable)
       {
