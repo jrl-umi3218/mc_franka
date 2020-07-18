@@ -98,16 +98,19 @@ int main(int argc, char * argv[])
     std::vector<double> q_vector;
     std::vector<double> dq_vector;
     std::vector<double> tau_vector;
+    std::vector<double> dtau_vector;
     init_q_vector.resize(dof);
     q_vector.resize(dof);
     dq_vector.resize(dof);
     tau_vector.resize(dof);
+    dtau_vector.resize(dof);
     for(size_t i = 0; i < dof; ++i)
     {
       init_q_vector.at(i)=state.q[i];
       q_vector.at(i)=state.q[i];
       dq_vector.at(i)=state.dq[i];
       tau_vector.at(i)=state.tau_J[i];
+      dtau_vector.at(i)=state.tau_J[i];
     }
     // FIXME Temporary work-around until we handle the gripper
     int counter=dof-1;
@@ -119,6 +122,7 @@ int main(int argc, char * argv[])
     controller.setEncoderValues(q_vector);
     controller.setEncoderVelocities(dq_vector);
     controller.setJointTorques(tau_vector);
+    // controller.setJointTorques(dtau_vector); //TODO extend interface
     controller.setWrenches(wrenches);
     controller.init(init_q_vector);
     controller.running = true;
@@ -172,13 +176,14 @@ int main(int argc, char * argv[])
     bool is_singular = false;;
     franka::Model model = robot.loadModel();
     franka::JointVelocities output_dq(state.dq);
-    robot.control([&print_data,&model,&controller,&sucker,&pump,&pumpAvailable,&sensor,&sensorAvailable,&q_vector,&dq_vector,&tau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
+    robot.control([&print_data,&model,&controller,&sucker,&pump,&pumpAvailable,&sensor,&sensorAvailable,&q_vector,&dq_vector,&tau_vector,&dtau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
     {
       for(size_t i = 0; i < state.q.size(); ++i)
       {
         q_vector[i] = state.q[i];
         dq_vector[i] = state.dq[i];
         tau_vector[i] = state.tau_J[i];
+        dtau_vector[i] = state.dtau_J[i];
       }
 
       wrench.force().x() = state.K_F_ext_hat_K[0];
@@ -232,13 +237,17 @@ int main(int argc, char * argv[])
       controller.setEncoderValues(q_vector);
       controller.setEncoderVelocities(dq_vector);
       controller.setJointTorques(tau_vector);
+      // controller.setJointDTorques(ddtau_vector); //TODO extend interface
       controller.setWrenches(wrenches);
       if(sensorAvailable)
       {
-        const franka::VacuumGripperState stateSucker = sucker->readOnce();
         sensor->set_tau_ext_hat_filtered(state.tau_ext_hat_filtered);
         sensor->set_O_F_ext_hat_K(state.O_F_ext_hat_K);
         sensor->set_control_command_success_rate(state.control_command_success_rate);
+        sensor->set_m_ee(state.m_ee);
+        sensor->set_m_load(state.m_load);
+        sensor->set_joint_contact(state.joint_contact);
+        sensor->set_cartesian_contact(state.cartesian_contact);
       }
       if(pumpAvailable)
       {
