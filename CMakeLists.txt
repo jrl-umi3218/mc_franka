@@ -18,6 +18,7 @@ find_package(mc_panda REQUIRED)
 
 add_executable(PrintPandaState src/PrintPandaState.cpp)
 add_executable(TestCobotPump src/TestCobotPump.cpp)
+add_executable(TestCobotPumpViaMCRTC src/TestCobotPumpViaMCRTC.cpp)
 add_executable(GravComp src/GravComp.cpp)
 add_executable(MCFrankaControl src/MCFrankaControl.cpp)
 add_executable(MCFrankaTorqueControl src/MCFrankaTorqueControl.cpp)
@@ -25,6 +26,7 @@ add_executable(MCFrankaControlMulti src/MCFrankaControlMulti.cpp src/Controller.
 add_executable(MCFrankaControlTest src/MCFrankaControlMultiTest.cpp)
 target_link_libraries(PrintPandaState PUBLIC mc_rtc::mc_control Franka::Franka)
 target_link_libraries(TestCobotPump PUBLIC mc_rtc::mc_control Franka::Franka)
+target_link_libraries(TestCobotPumpViaMCRTC PUBLIC mc_rtc::mc_control Franka::Franka mc_panda::devices)
 target_link_libraries(GravComp PUBLIC mc_rtc::mc_control Franka::Franka)
 target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka mc_panda::devices)
 target_link_libraries(MCFrankaTorqueControl PUBLIC mc_rtc::mc_control Franka::Franka)
@@ -32,6 +34,7 @@ target_link_libraries(MCFrankaControlMulti PUBLIC mc_rtc::mc_control ${Franka_LI
 target_link_libraries(MCFrankaControlTest PUBLIC mc_rtc::mc_control ${Franka_LIBRARIES} PocoNet) #PocoFoundation 
 install(TARGETS PrintPandaState DESTINATION bin)
 install(TARGETS TestCobotPump DESTINATION bin)
+install(TARGETS TestCobotPumpViaMCRTC DESTINATION bin)
 install(TARGETS GravComp DESTINATION bin)
 install(TARGETS MCFrankaControl DESTINATION bin)
 install(TARGETS MCFrankaTorqueControl DESTINATION bin)
