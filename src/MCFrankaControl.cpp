@@ -136,6 +136,7 @@ int main(int argc, char * argv[])
     if(controller.robot().hasDevice<mc_panda::PandaSensor>(sensorDeviceName))
     {
       sensor = std::make_shared<mc_panda::PandaSensor>( controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName) );
+      sensor->addToLogger(controller.controller().logger());
       sensorAvailable = true;
       mc_rtc::log::info("RobotModule has a PandaSensor named {}", sensorDeviceName);
     }
@@ -157,6 +158,7 @@ int main(int argc, char * argv[])
       if(controller.robot().hasDevice<mc_panda::Pump>(pumpDeviceName))
       {
         pump = std::make_shared<mc_panda::Pump>( controller.robot().device<mc_panda::Pump>(pumpDeviceName) );
+        pump->addToLogger(controller.controller().logger());
         pumpAvailable = true;
         mc_rtc::log::info("RobotModule has a Pump named {}", pumpDeviceName);
       }
