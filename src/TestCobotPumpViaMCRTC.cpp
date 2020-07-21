@@ -79,7 +79,7 @@ int main(int argc, char * argv[])
 
     // Start the sense-actuate loop
     franka::VacuumGripperState stateSucker;
-    mc_panda::NextCommand nc;
+    mc_panda::NextPumpCommand nc;
     bool looping = true;
     while(looping)
     {
@@ -98,14 +98,14 @@ int main(int argc, char * argv[])
       pump->set_vacuum(stateSucker.vacuum);
 
       //receive sucker actuator commands from mc_rtc
-      nc = pump->nextCommandRequested();
+      nc = pump->NextPumpCommandRequested();
       switch(nc)
       {
-        case mc_panda::NextCommand::None:
+        case mc_panda::NextPumpCommand::None:
         {
           break;
         }
-        case mc_panda::NextCommand::Vacuum:
+        case mc_panda::NextPumpCommand::Vacuum:
         {
           uint8_t vacuum;
           std::chrono::milliseconds timeout;
@@ -115,7 +115,7 @@ int main(int argc, char * argv[])
           mc_rtc::log::info("vacuum command applied with the params vacuum {} and timeout {}, result: {}", std::to_string(vacuum), std::to_string(timeout.count()), vacuumOK);
           break;
         }
-        case mc_panda::NextCommand::Dropoff:
+        case mc_panda::NextPumpCommand::Dropoff:
         {
           std::chrono::milliseconds timeout;
           pump->getDropoffCommandParam(timeout);
@@ -124,7 +124,7 @@ int main(int argc, char * argv[])
           mc_rtc::log::info("dropoff command applied with the param timeout {}, result: {}", std::to_string(timeout.count()), dropoffOK);
           break;
         }
-        case mc_panda::NextCommand::Stop:
+        case mc_panda::NextPumpCommand::Stop:
         {
           const bool stopOK = sucker->stop();
           pump->setStopCommandResult(stopOK);
