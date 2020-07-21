@@ -143,7 +143,6 @@ int main(int argc, char * argv[])
       mc_rtc::log::warning("RobotModule does not have a PandaSensor named {}", sensorDeviceName);
       mc_rtc::log::warning("PandaSensor functionality will not be available");
     }
-    sensorAvailable = false; //TODO THIS IS A HACK
     
     // Start the control loop in velocity-control
     bool is_singular = false;;
