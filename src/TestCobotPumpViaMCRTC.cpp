@@ -51,7 +51,9 @@ int main(int argc, char * argv[])
     }
     controller.init(init_q_vector);
     controller.running = true;
-    
+    controller.controller().gui()->addElement({"Franka"},
+                                              mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
+
     // Initialize the libfranka VacuumGripper as 'sucker' and the mc_panda Pump as 'pump' if the robot-module has such a device
     std::shared_ptr<franka::VacuumGripper> sucker;
     std::shared_ptr<mc_panda::Pump> pump;
@@ -81,8 +83,14 @@ int main(int argc, char * argv[])
     franka::VacuumGripperState stateSucker;
     mc_panda::NextPumpCommand nc;
     bool looping = true;
+    int counter=0;
     while(looping)
     {
+      counter++;
+      mc_rtc::log::info("loop number {}", counter);
+      controller.setEncoderValues(init_q_vector);
+      controller.run();
+
       //forward sucker sensor signals to mc_rtc
       stateSucker = sucker->readOnce();
       pump->set_in_control_range(stateSucker.in_control_range);
@@ -103,10 +111,12 @@ int main(int argc, char * argv[])
       {
         case mc_panda::NextPumpCommand::None:
         {
+          mc_rtc::log::info("no command requested");
           break;
         }
         case mc_panda::NextPumpCommand::Vacuum:
         {
+          mc_rtc::log::info("vacuum command requested");
           uint8_t vacuum;
           std::chrono::milliseconds timeout;
           pump->getVacuumCommandParams(vacuum, timeout);
@@ -117,6 +127,7 @@ int main(int argc, char * argv[])
         }
         case mc_panda::NextPumpCommand::Dropoff:
         {
+          mc_rtc::log::info("dropoff command requested");
           std::chrono::milliseconds timeout;
           pump->getDropoffCommandParam(timeout);
           const bool dropoffOK = sucker->dropOff(timeout);
@@ -126,6 +137,7 @@ int main(int argc, char * argv[])
         }
         case mc_panda::NextPumpCommand::Stop:
         {
+          mc_rtc::log::info("stop command requested");
           const bool stopOK = sucker->stop();
           pump->setStopCommandResult(stopOK);
           mc_rtc::log::info("stop command applied, result: {}", stopOK);
