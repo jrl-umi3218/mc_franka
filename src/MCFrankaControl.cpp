@@ -148,6 +148,14 @@ int main(int argc, char * argv[])
     franka::JointVelocities output_dq(state.dq);
     robot.control([&print_data,&model,&controller,&sensorAvailable,&sensorDeviceName,&q_vector,&dq_vector,&tau_vector,&dtau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
     {
+      if(sensorAvailable)
+      {
+        if(controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName).stopRequested())
+        {
+          return franka::MotionFinished(output_dq);
+        }
+      }
+
       for(size_t i = 0; i < state.q.size(); ++i)
       {
         q_vector[i] = state.q[i];
