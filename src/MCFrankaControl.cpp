@@ -93,12 +93,13 @@ struct PandaControlLoop
     control.control(robot,
                     [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
                     typename PandaControlType<cm>::ReturnT {
-                      static bool started = [this]() {
+                      if(!started)
+                      {
                         timespec tv;
                         clock_gettime(CLOCK_REALTIME, &tv);
                         mc_rtc::log::info("[mc_franka] {} control loop started at {}.{}", name, tv.tv_sec, tv.tv_nsec);
-                        return true;
-                      }();
+                        started = true;
+                      }
                       this->state = stateIn;
                       sensor_id += 1;
                       auto & robot = controller.controller().robots().robot(name);
@@ -124,6 +125,7 @@ struct PandaControlLoop
   size_t sensor_id = 0;
   size_t steps = 1;
   rbd::MultiBodyConfig command;
+  bool started = false;
 };
 
 template<ControlMode cm>
