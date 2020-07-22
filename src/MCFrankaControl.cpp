@@ -28,6 +28,7 @@ std::condition_variable sensors_cv;
 std::mutex sensors_mutex;
 std::condition_variable command_cv;
 std::mutex command_mutex;
+bool command_ready = false;
 std::condition_variable start_control_cv;
 std::mutex start_control_mutex;
 bool start_control_ready = false;
@@ -115,7 +116,7 @@ struct PandaControlLoop
                       {
                         sensors_cv.notify_all();
                         std::unique_lock<std::mutex> command_lock(command_mutex);
-                        command_cv.wait(command_lock);
+                        command_cv.wait(command_lock, []() { return command_ready; });
                       }
                       if(controller.running)
                       {
@@ -239,9 +240,11 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
         panda.first.updateSensors(controller);
         panda.second = panda.first.sensor_id;
       }
+      command_ready = true;
       command_cv.notify_all();
     }
     controller.run();
+    command_ready = false;
   }
   for(auto & th : panda_threads)
   {
