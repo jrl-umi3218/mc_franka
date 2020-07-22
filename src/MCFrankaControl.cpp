@@ -97,7 +97,7 @@ struct PandaControlLoop
   {
     {
       std::unique_lock<std::mutex> start_control_lock(start_control_mutex);
-      start_control_cv.wait(start_control_lock, [](){ return start_control_ready; });
+      start_control_cv.wait(start_control_lock, []() { return start_control_ready; });
     }
     control.control(robot,
                     [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
@@ -106,7 +106,8 @@ struct PandaControlLoop
                       {
                         timespec tv;
                         clock_gettime(CLOCK_REALTIME, &tv);
-                        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name, tv.tv_sec + tv.tv_nsec * 1e-9);
+                        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name,
+                                          tv.tv_sec + tv.tv_nsec * 1e-9);
                         started = true;
                       }
                       this->state = stateIn;
@@ -179,7 +180,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       if(frankaConfig.has(robot.name()))
       {
         std::string ip = frankaConfig(robot.name())("ip");
-        panda_init_threads.emplace_back([&,ip]() {
+        panda_init_threads.emplace_back([&, ip]() {
           {
             std::unique_lock<std::mutex> lock(pandas_init_mutex);
             pandas_init_cv.wait(lock, [&pandas_init_ready]() { return pandas_init_ready; });
@@ -196,6 +197,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       }
     }
     pandas_init_ready = true;
+    pandas_init_cv.notify_all();
     for(auto & th : panda_init_threads)
     {
       th.join();
@@ -235,7 +237,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
         return sensors_ready == pandas.size();
       });
       sensors_ready = 0;
-      if(iter++ % 5 * freq == 0 && pandas.size() > 1)
+      if(iter++ % (5 * freq) == 0 && pandas.size() > 1)
       {
         mc_time::duration_us delay = mc_time::clock::now() - start;
         mc_rtc::log::info("[mc_franka] Measured delay between the pandas: {}us", delay.count());
