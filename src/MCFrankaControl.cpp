@@ -215,7 +215,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
                                                  [&panda]() { return panda.first.control_t; });
   }
   mc_time::duration_us mc_franka_dt{0};
-  controller.controller().logger().addLogEntry("Perf_mc_franka", [&]() { return mc_franka_dt.count(); });
+  controller.controller().logger().addLogEntry("perf_mc_franka", [&]() { return mc_franka_dt.count() / 1000; });
   controller.init(robots.robot().encoderValues());
   controller.running = true;
   controller.controller().gui()->addElement(
