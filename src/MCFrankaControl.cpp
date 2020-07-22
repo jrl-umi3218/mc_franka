@@ -214,6 +214,8 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     controller.controller().logger().addLogEntry(panda.first.name + "_control_t",
                                                  [&panda]() { return panda.first.control_t; });
   }
+  mc_time::duration_us mc_franka_dt{0};
+  controller.controller().logger().addLogEntry("Perf_mc_franka", [&]() { return mc_franka_dt.count(); });
   controller.init(robots.robot().encoderValues());
   controller.running = true;
   controller.controller().gui()->addElement(
@@ -229,6 +231,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   size_t iter = 0;
   while(controller.running)
   {
+    auto start_t = mc_time::clock::now();
     {
       std::unique_lock<std::mutex> sensors_lock(sensors_mutex);
       bool start_measure = false;
@@ -255,6 +258,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     }
     controller.run();
     control_id++;
+    mc_franka_dt = mc_time::clock::now() - start_t;
   }
   for(auto & th : panda_threads)
   {
