@@ -27,12 +27,10 @@ using clock = typename std::conditional<std::chrono::high_resolution_clock::is_s
 std::condition_variable sensors_cv;
 std::mutex sensors_mutex;
 std::atomic<size_t> sensors_ready(0);
-std::condition_variable command_cv;
-std::mutex command_mutex;
-std::atomic<size_t> command_ready(0);
 std::condition_variable start_control_cv;
 std::mutex start_control_mutex;
 bool start_control_ready = false;
+size_t control_id = 0;
 
 template<ControlMode cm>
 struct PandaControlLoop
@@ -99,35 +97,38 @@ struct PandaControlLoop
       std::unique_lock<std::mutex> start_control_lock(start_control_mutex);
       start_control_cv.wait(start_control_lock, []() { return start_control_ready; });
     }
-    control.control(robot,
-                    [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
-                    typename PandaControlType<cm>::ReturnT {
-                      timespec tv;
-                      clock_gettime(CLOCK_REALTIME, &tv);
-                      control_t = tv.tv_sec + tv.tv_nsec * 1e-9;
-                      if(!started)
-                      {
-                        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name, control_t);
-                        started = true;
-                      }
-                      this->state = stateIn;
-                      sensor_id += 1;
-                      auto & robot = controller.controller().robots().robot(name);
-                      auto & real = controller.controller().realRobots().robot(name);
-                      if(sensor_id % steps == 0)
-                      {
-                        sensors_ready++;
-                        sensors_cv.notify_one();
-                        std::unique_lock<std::mutex> command_lock(command_mutex);
-                        command_cv.wait(command_lock, []() { return command_ready > 0; });
-                        command_ready--;
-                      }
-                      if(controller.running)
-                      {
-                        return control.update(robot, command, sensor_id % steps, steps);
-                      }
-                      return franka::MotionFinished(control);
-                    });
+    control.control(robot, [
+      this, &controller
+    ](const franka::RobotState & stateIn, franka::Duration) -> typename PandaControlType<cm>::ReturnT {
+      timespec tv;
+      clock_gettime(CLOCK_REALTIME, &tv);
+      control_t = tv.tv_sec + tv.tv_nsec * 1e-9;
+      if(!started)
+      {
+        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name, control_t);
+        started = true;
+      }
+      this->state = stateIn;
+      sensor_id += 1;
+      auto & robot = controller.controller().robots().robot(name);
+      auto & real = controller.controller().realRobots().robot(name);
+      if(sensor_id % steps == 0)
+      {
+        if(control_id + steps != sensor_id)
+        {
+          mc_rtc::log::warning("[mc_franka] {} using out-dated control data (sensor id: {}, control id: {})", name,
+                               sensor_id, control_id);
+        }
+        updateSensors(controller);
+        sensors_ready++;
+        sensors_cv.notify_one();
+      }
+      if(controller.running)
+      {
+        return control.update(robot, command, sensor_id % steps, steps);
+      }
+      return franka::MotionFinished(control);
+    });
   }
 
   std::string name;
@@ -247,13 +248,11 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       }
       for(auto & panda : pandas)
       {
-        panda.first.updateSensors(controller);
         panda.second = panda.first.sensor_id;
       }
-      command_ready = pandas.size();
-      command_cv.notify_all();
     }
     controller.run();
+    control_id++;
   }
   for(auto & th : panda_threads)
   {
