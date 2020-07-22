@@ -26,9 +26,10 @@ using clock = typename std::conditional<std::chrono::high_resolution_clock::is_s
 
 std::condition_variable sensors_cv;
 std::mutex sensors_mutex;
+std::atomic<size_t> sensors_ready(0);
 std::condition_variable command_cv;
 std::mutex command_mutex;
-bool command_ready = false;
+std::atomic<size_t> command_ready(0);
 std::condition_variable start_control_cv;
 std::mutex start_control_mutex;
 bool start_control_ready = false;
@@ -114,9 +115,11 @@ struct PandaControlLoop
                       auto & real = controller.controller().realRobots().robot(name);
                       if(sensor_id % steps == 0)
                       {
-                        sensors_cv.notify_all();
+                        sensors_ready++;
+                        sensors_cv.notify_one();
                         std::unique_lock<std::mutex> command_lock(command_mutex);
-                        command_cv.wait(command_lock, []() { return command_ready; });
+                        command_cv.wait(command_lock, []() { return command_ready > 0; });
+                        command_ready--;
                       }
                       if(controller.running)
                       {
@@ -216,20 +219,15 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       bool start_measure = false;
       std::chrono::time_point<mc_time::clock> start;
       sensors_cv.wait(sensors_lock, [&]() {
-        if(!start_measure)
+        auto ready = sensors_ready.load();
+        if(!start_measure && ready >= 1)
         {
           start_measure = true;
           start = mc_time::clock::now();
         }
-        for(const auto & panda : pandas)
-        {
-          if(panda.first.sensor_id % n_steps != 0 || panda.first.sensor_id == panda.second)
-          {
-            return false;
-          }
-        }
-        return true;
+        return ready == pandas.size();
       });
+      sensors_ready = 0;
       if(iter++ % 5 * freq == 0 && pandas.size() > 1)
       {
         mc_time::duration_us delay = mc_time::clock::now() - start;
@@ -240,11 +238,10 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
         panda.first.updateSensors(controller);
         panda.second = panda.first.sensor_id;
       }
-      command_ready = true;
+      command_ready = pandas.size();
       command_cv.notify_all();
     }
     controller.run();
-    command_ready = false;
   }
   for(auto & th : panda_threads)
   {
