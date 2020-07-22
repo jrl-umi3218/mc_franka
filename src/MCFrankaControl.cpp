@@ -102,12 +102,12 @@ struct PandaControlLoop
     control.control(robot,
                     [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
                     typename PandaControlType<cm>::ReturnT {
+                      timespec tv;
+                      clock_gettime(CLOCK_REALTIME, &tv);
+                      control_t = tv.tv_sec + tv.tv_nsec * 1e-9;
                       if(!started)
                       {
-                        timespec tv;
-                        clock_gettime(CLOCK_REALTIME, &tv);
-                        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name,
-                                          tv.tv_sec + tv.tv_nsec * 1e-9);
+                        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name, control_t);
                         started = true;
                       }
                       this->state = stateIn;
@@ -138,6 +138,7 @@ struct PandaControlLoop
   size_t steps = 1;
   rbd::MultiBodyConfig command;
   bool started = false;
+  double control_t = 0;
 };
 
 template<ControlMode cm>
@@ -207,6 +208,8 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   {
     panda.first.init(controller);
     controller.controller().logger().addLogEntry(panda.first.name + "_sensors_id", [&panda]() { return panda.second; });
+    controller.controller().logger().addLogEntry(panda.first.name + "_control_t",
+                                                 [&panda]() { return panda.first.control_t; });
   }
   controller.init(robots.robot().encoderValues());
   controller.running = true;
