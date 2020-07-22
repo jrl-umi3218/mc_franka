@@ -114,12 +114,13 @@ struct PandaControlLoop
       auto & real = controller.controller().realRobots().robot(name);
       if(sensor_id % steps == 0)
       {
-        if(control_id + steps != sensor_id)
+        if(control_id != 0 && control_id - 1 != prev_control_id)
         {
-          mc_rtc::log::warning("[mc_franka] {} using out-dated control data (sensor id: {}, control id: {})", name,
-                               sensor_id, control_id);
+          mc_rtc::log::warning("[mc_franka] {} missed control data (previous control id: {}, control id: {})", name,
+                               prev_control_id, control_id);
         }
         updateSensors(controller);
+        prev_control_id = control_id;
         sensors_ready++;
         sensors_cv.notify_one();
       }
@@ -140,6 +141,7 @@ struct PandaControlLoop
   rbd::MultiBodyConfig command;
   bool started = false;
   double control_t = 0;
+  size_t prev_control_id = 0;
 };
 
 template<ControlMode cm>
