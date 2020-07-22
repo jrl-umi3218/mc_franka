@@ -163,7 +163,9 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   std::vector<std::pair<PandaControlLoop<cm>, size_t>> pandas;
   {
     std::vector<std::thread> panda_init_threads;
-    std::mutex pandas_mutex;
+    std::mutex pandas_init_mutex;
+    std::condition_variable pandas_init_cv;
+    bool pandas_init_ready = false;
     for(auto & robot : robots)
     {
       if(robot.mb().nrDof() == 0)
@@ -177,9 +179,13 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       if(frankaConfig.has(robot.name()))
       {
         std::string ip = frankaConfig(robot.name())("ip");
-        panda_init_threads.emplace_back([&robot,&pandas,&pandas_mutex,ip,n_steps]() {
+        panda_init_threads.emplace_back([&,ip]() {
+          {
+            std::unique_lock<std::mutex> lock(pandas_init_mutex);
+            pandas_init_cv.wait(lock, [&pandas_init_ready]() { return pandas_init_ready; });
+          }
           auto pair = std::make_pair<PandaControlLoop<cm>, size_t>({robot.name(), ip, n_steps}, 0);
-          std::lock_guard<std::mutex> lock(pandas_mutex);
+          std::unique_lock<std::mutex> lock(pandas_init_mutex);
           pandas.emplace_back(std::move(pair));
         });
       }
@@ -189,6 +195,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
                              robot.name());
       }
     }
+    pandas_init_ready = true;
     for(auto & th : panda_init_threads)
     {
       th.join();
@@ -225,7 +232,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
           start_measure = true;
           start = mc_time::clock::now();
         }
-        return ready == pandas.size();
+        return sensors_ready == pandas.size();
       });
       sensors_ready = 0;
       if(iter++ % 5 * freq == 0 && pandas.size() > 1)
