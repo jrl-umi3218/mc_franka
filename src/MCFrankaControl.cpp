@@ -38,7 +38,7 @@ struct PandaControlLoop
     static auto panda_init_t = mc_time::clock::now();
     auto now = mc_time::clock::now();
     mc_time::duration_us dt = now - panda_init_t;
-    mc_rtc::log::info("Elapsed time since the creation of another PandaControlLoop: {}us", dt.count());
+    mc_rtc::log::info("[mc_franka] Elapsed time since the creation of another PandaControlLoop: {}us", dt.count());
     panda_init_t = now;
   }
 
@@ -93,6 +93,12 @@ struct PandaControlLoop
     control.control(robot,
                     [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
                     typename PandaControlType<cm>::ReturnT {
+                      static bool started = [this]() {
+                        timespec tv;
+                        clock_gettime(CLOCK_REALTIME, &tv);
+                        mc_rtc::log::info("[mc_franka] {} control loop started at {}.{}", name, tv.tv_sec, tv.tv_nsec);
+                        return true;
+                      }();
                       this->state = stateIn;
                       sensor_id += 1;
                       auto & robot = controller.controller().robots().robot(name);
