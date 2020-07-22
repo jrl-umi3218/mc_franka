@@ -56,16 +56,14 @@ int main(int argc, char * argv[])
 
     // Initialize the libfranka VacuumGripper as 'sucker' and the mc_panda Pump as 'pump' if the robot-module has such a device
     std::shared_ptr<franka::VacuumGripper> sucker;
-    std::shared_ptr<mc_panda::Pump> pump;
+    std::string pumpDeviceName = "Pump";
     try{
       sucker = std::make_shared<franka::VacuumGripper>( franka::VacuumGripper(argv[1]) );
       mc_rtc::log::info("Connection established to VacuumGripper via {}", argv[1]);
-      
-      std::string pumpDeviceName = "Pump";
+      sucker->stop();
       if(controller.robot().hasDevice<mc_panda::Pump>(pumpDeviceName))
       {
-        pump = std::make_shared<mc_panda::Pump>( controller.robot().device<mc_panda::Pump>(pumpDeviceName) );
-        pump->addToLogger(controller.controller().logger());
+        controller.robot().device<mc_panda::Pump>(pumpDeviceName).addToLogger(controller.controller().logger());
         mc_rtc::log::info("RobotModule has a Pump named {}", pumpDeviceName);
       }
       else{
@@ -80,6 +78,7 @@ int main(int argc, char * argv[])
     }
 
     // Start the sense-actuate loop
+    auto & pumpDevice = controller.robot().device<mc_panda::Pump>(pumpDeviceName);
     franka::VacuumGripperState stateSucker;
     mc_panda::NextPumpCommand nc;
     bool looping = true;
@@ -93,20 +92,20 @@ int main(int argc, char * argv[])
 
       //forward sucker sensor signals to mc_rtc
       stateSucker = sucker->readOnce();
-      pump->set_in_control_range(stateSucker.in_control_range);
-      pump->set_part_detached(stateSucker.part_detached);
-      pump->set_part_present(stateSucker.part_present);
+      pumpDevice.set_in_control_range(stateSucker.in_control_range);
+      pumpDevice.set_part_detached(stateSucker.part_detached);
+      pumpDevice.set_part_present(stateSucker.part_present);
       if(stateSucker.device_status==franka::VacuumGripperDeviceStatus::kGreen){
-        pump->set_device_status_ok(true);
+        pumpDevice.set_device_status_ok(true);
       }
       else{
-        pump->set_device_status_ok(false);
+        pumpDevice.set_device_status_ok(false);
       }
-      pump->set_actual_power(stateSucker.actual_power);
-      pump->set_vacuum(stateSucker.vacuum);
+      pumpDevice.set_actual_power(stateSucker.actual_power);
+      pumpDevice.set_vacuum(stateSucker.vacuum);
 
       //receive sucker actuator commands from mc_rtc
-      nc = pump->NextPumpCommandRequested();
+      nc = pumpDevice.NextPumpCommandRequested();
       switch(nc)
       {
         case mc_panda::NextPumpCommand::None:
@@ -119,9 +118,9 @@ int main(int argc, char * argv[])
           mc_rtc::log::info("vacuum command requested");
           uint8_t vacuum;
           std::chrono::milliseconds timeout;
-          pump->getVacuumCommandParams(vacuum, timeout);
+          pumpDevice.getVacuumCommandParams(vacuum, timeout);
           const bool vacuumOK = sucker->vacuum(vacuum, timeout);
-          pump->setVacuumCommandResult(vacuumOK);
+          pumpDevice.setVacuumCommandResult(vacuumOK);
           mc_rtc::log::info("vacuum command applied with the params vacuum {} and timeout {}, result: {}", std::to_string(vacuum), std::to_string(timeout.count()), vacuumOK);
           break;
         }
@@ -129,9 +128,9 @@ int main(int argc, char * argv[])
         {
           mc_rtc::log::info("dropoff command requested");
           std::chrono::milliseconds timeout;
-          pump->getDropoffCommandParam(timeout);
+          pumpDevice.getDropoffCommandParam(timeout);
           const bool dropoffOK = sucker->dropOff(timeout);
-          pump->setDropoffCommandResult(dropoffOK);
+          pumpDevice.setDropoffCommandResult(dropoffOK);
           mc_rtc::log::info("dropoff command applied with the param timeout {}, result: {}", std::to_string(timeout.count()), dropoffOK);
           break;
         }
@@ -139,7 +138,7 @@ int main(int argc, char * argv[])
         {
           mc_rtc::log::info("stop command requested");
           const bool stopOK = sucker->stop();
-          pump->setStopCommandResult(stopOK);
+          pumpDevice.setStopCommandResult(stopOK);
           mc_rtc::log::info("stop command applied, result: {}", stopOK);
           looping = false;
           break;

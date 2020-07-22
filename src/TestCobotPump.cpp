@@ -41,6 +41,7 @@ int main(int argc, char * argv[])
 
     // Get the initial state of the sucker
     franka::VacuumGripper sucker(argv[1]);
+    sucker.stop();
     const franka::VacuumGripperState stateSucker = sucker.readOnce();
     std::cout << "Initial vacuum gripper state: " << stateSucker << std::endl;
     bool icr = stateSucker.in_control_range;

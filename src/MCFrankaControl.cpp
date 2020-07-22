@@ -130,12 +130,10 @@ int main(int argc, char * argv[])
 
     // Initialize the the mc_panda PandaSensor as 'sensor' if the robot-module has such a device
     bool sensorAvailable = false;
-    std::shared_ptr<mc_panda::PandaSensor> sensor;
     std::string sensorDeviceName = "PandaSensor";
     if(controller.robot().hasDevice<mc_panda::PandaSensor>(sensorDeviceName))
     {
-      sensor = std::make_shared<mc_panda::PandaSensor>( controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName) );
-      sensor->addToLogger(controller.controller().logger());
+      controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName).addToLogger(controller.controller().logger());
       sensorAvailable = true;
       mc_rtc::log::info("RobotModule has a PandaSensor named {}", sensorDeviceName);
     }
@@ -148,7 +146,7 @@ int main(int argc, char * argv[])
     bool is_singular = false;;
     franka::Model model = robot.loadModel();
     franka::JointVelocities output_dq(state.dq);
-    robot.control([&print_data,&model,&controller,&sensor,&sensorAvailable,&q_vector,&dq_vector,&tau_vector,&dtau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
+    robot.control([&print_data,&model,&controller,&sensorAvailable,&sensorDeviceName,&q_vector,&dq_vector,&tau_vector,&dtau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
     {
       for(size_t i = 0; i < state.q.size(); ++i)
       {
@@ -213,13 +211,14 @@ int main(int argc, char * argv[])
       controller.setWrenches(wrenches);
       if(sensorAvailable)
       {
-        sensor->set_tau_ext_hat_filtered(state.tau_ext_hat_filtered);
-        sensor->set_O_F_ext_hat_K(state.O_F_ext_hat_K);
-        sensor->set_control_command_success_rate(state.control_command_success_rate);
-        sensor->set_m_ee(state.m_ee);
-        sensor->set_m_load(state.m_load);
-        sensor->set_joint_contact(state.joint_contact);
-        sensor->set_cartesian_contact(state.cartesian_contact);
+        auto & pandaSensor = controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName);
+        pandaSensor.set_tau_ext_hat_filtered(state.tau_ext_hat_filtered);
+        pandaSensor.set_O_F_ext_hat_K(state.O_F_ext_hat_K);
+        pandaSensor.set_control_command_success_rate(state.control_command_success_rate);
+        pandaSensor.set_m_ee(state.m_ee);
+        pandaSensor.set_m_load(state.m_load);
+        pandaSensor.set_joint_contact(state.joint_contact);
+        pandaSensor.set_cartesian_contact(state.cartesian_contact);
       }
 
       if(controller.running && controller.run())
