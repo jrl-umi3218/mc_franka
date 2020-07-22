@@ -28,6 +28,8 @@ std::condition_variable sensors_cv;
 std::mutex sensors_mutex;
 std::condition_variable command_cv;
 std::mutex command_mutex;
+std::condition_variable start_control_cv;
+std::mutex start_control_mutex;
 
 template<ControlMode cm>
 struct PandaControlLoop
@@ -90,6 +92,10 @@ struct PandaControlLoop
 
   void control_thread(mc_control::MCGlobalController & controller)
   {
+    {
+      std::unique_lock<std::mutex> start_control_lock(start_control_mutex);
+      start_control_cv.wait(start_control_lock);
+    }
     control.control(robot,
                     [ this, &controller ](const franka::RobotState & stateIn, franka::Duration) ->
                     typename PandaControlType<cm>::ReturnT {
@@ -97,7 +103,7 @@ struct PandaControlLoop
                       {
                         timespec tv;
                         clock_gettime(CLOCK_REALTIME, &tv);
-                        mc_rtc::log::info("[mc_franka] {} control loop started at {}.{}", name, tv.tv_sec, tv.tv_nsec);
+                        mc_rtc::log::info("[mc_franka] {} control loop started at {}", name, tv.tv_sec + tv.tv_nsec * 1e-9);
                         started = true;
                       }
                       this->state = stateIn;
@@ -198,6 +204,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   {
     panda_threads.emplace_back([&panda, &controller]() { panda.first.control_thread(controller); });
   }
+  start_control_cv.notify_all();
   size_t iter = 0;
   while(controller.running)
   {
