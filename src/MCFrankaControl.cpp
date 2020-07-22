@@ -20,6 +20,8 @@ using clock = typename std::conditional<std::chrono::high_resolution_clock::is_s
                                         std::chrono::high_resolution_clock,
                                         std::chrono::steady_clock>::type;
 
+std::chrono::time_point<clock> panda_init_t;
+
 } // namespace mc_time
 
 #include "PandaControlType.h"
@@ -35,6 +37,9 @@ struct PandaControlLoop
   PandaControlLoop(const std::string & name, const std::string & ip, size_t steps)
   : name(name), robot(ip), state(robot.readOnce()), control(state), steps(steps)
   {
+    auto now = mc_time::clock::now();
+    mc_time::duration_us dt = now - mc_time::panda_init_t;
+    mc_rtc::log::info("Elapsed time since the creation of another PandaControlLoop: {}us", dt.count());
   }
 
   void updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robot & real)
@@ -140,6 +145,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   {
     std::vector<std::thread> panda_init_threads;
     std::mutex pandas_mutex;
+    mc_time::panda_init_t = mc_time::clock::now();
     for(auto & robot : robots)
     {
       if(robot.mb().nrDof() == 0)
