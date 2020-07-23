@@ -35,8 +35,8 @@ size_t control_id = 0;
 template<ControlMode cm>
 struct PandaControlLoop
 {
-  PandaControlLoop(const std::string & name, const std::string & ip, size_t steps)
-  : name(name), robot(ip), state(robot.readOnce()), control(state), steps(steps)
+  PandaControlLoop(const std::string & name, const std::string & ip, size_t steps, bool leader)
+  : name(name), robot(ip), state(robot.readOnce()), control(state), steps(steps), leader(leader)
   {
     static auto panda_init_t = mc_time::clock::now();
     auto now = mc_time::clock::now();
@@ -122,7 +122,10 @@ struct PandaControlLoop
         updateSensors(controller);
         prev_control_id = control_id;
         sensors_ready++;
-        sensors_cv.notify_one();
+        if(leader)
+        {
+          sensors_cv.notify_one();
+        }
       }
       if(controller.running)
       {
@@ -142,6 +145,7 @@ struct PandaControlLoop
   bool started = false;
   double control_t = 0;
   size_t prev_control_id = 0;
+  bool leader = false;
 };
 
 template<ControlMode cm>
@@ -171,6 +175,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     std::mutex pandas_init_mutex;
     std::condition_variable pandas_init_cv;
     bool pandas_init_ready = false;
+    bool leader = true;
     for(auto & robot : robots)
     {
       if(robot.mb().nrDof() == 0)
@@ -184,15 +189,16 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       if(frankaConfig.has(robot.name()))
       {
         std::string ip = frankaConfig(robot.name())("ip");
-        panda_init_threads.emplace_back([&, ip]() {
+        panda_init_threads.emplace_back([&, ip, leader]() {
           {
             std::unique_lock<std::mutex> lock(pandas_init_mutex);
             pandas_init_cv.wait(lock, [&pandas_init_ready]() { return pandas_init_ready; });
           }
-          auto pair = std::make_pair<PandaControlLoop<cm>, size_t>({robot.name(), ip, n_steps}, 0);
+          auto pair = std::make_pair<PandaControlLoop<cm>, size_t>({robot.name(), ip, n_steps, leader}, 0);
           std::unique_lock<std::mutex> lock(pandas_init_mutex);
           pandas.emplace_back(std::move(pair));
         });
+        leader = false;
       }
       else
       {
@@ -236,15 +242,7 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
       std::unique_lock<std::mutex> sensors_lock(sensors_mutex);
       bool start_measure = false;
       std::chrono::time_point<mc_time::clock> start;
-      sensors_cv.wait(sensors_lock, [&]() {
-        auto ready = sensors_ready.load();
-        if(!start_measure && ready >= 1)
-        {
-          start_measure = true;
-          start = mc_time::clock::now();
-        }
-        return sensors_ready == pandas.size();
-      });
+      sensors_cv.wait(sensors_lock);
       sensors_ready = 0;
       if(iter++ % (5 * freq) == 0 && pandas.size() > 1)
       {
