@@ -38,6 +38,14 @@ struct PandaControlLoop
   PandaControlLoop(const std::string & name, const std::string & ip, size_t steps, bool leader)
   : name(name), robot(ip), state(robot.readOnce()), control(state), steps(steps), leader(leader)
   {
+    if(leader)
+    {
+      mc_rtc::log::info("[mc_franka] {} is the panda squad leader", name);
+    }
+    else
+    {
+      mc_rtc::log::info("[mc_franka] {} is a panda squad follower", name);
+    }
     static auto panda_init_t = mc_time::clock::now();
     auto now = mc_time::clock::now();
     mc_time::duration_us dt = now - panda_init_t;
