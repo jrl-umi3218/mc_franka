@@ -61,6 +61,8 @@ int main(int argc, char * argv[])
 
   try
   {
+    mc_rtc::log::success("executing with ip={}", argv[1]);
+
     // Initialize the robot
     franka::Robot robot(argv[1]);
     robot.setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}}); //values taken from https://github.com/frankaemika/libfranka/blob/master/examples/examples_common.cpp#L18
@@ -88,7 +90,7 @@ int main(int argc, char * argv[])
     mc_control::MCGlobalController controller;
     if(controller.controller().timeStep != 0.001)
     {
-      LOG_ERROR_AND_THROW(std::runtime_error, "mc_rtc must be configured to run at 1kHz");
+      mc_rtc::log::error_and_throw<std::runtime_error>("mc_rtc must be configured to run at 1kHz");
     }
     sva::ForceVecd wrench = sva::ForceVecd(Eigen::Vector6d::Zero());
     std::map<std::string, sva::ForceVecd> wrenches;
@@ -152,6 +154,7 @@ int main(int argc, char * argv[])
       {
         if(controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName).stopRequested())
         {
+          mc_rtc::log::warning("PandaSensor device requests to stop the robot");
           return franka::MotionFinished(output_dq);
         }
       }
@@ -173,7 +176,7 @@ int main(int argc, char * argv[])
       
       is_singular = false;
       if(wrench.force().x()==0 && wrench.force().y()==0 && wrench.force().z()==0 && wrench.moment().x()==0 && wrench.moment().y()==0 && wrench.moment().z()==0 ){
-        // LOG_ERROR("libfranka wrench is zero") //NOTE this happens if smallest singular value of the jacobian is lower than 0.08...
+        // mc_rtc::log::warning("libfranka wrench is zero"); //NOTE this happens if smallest singular value of the jacobian is lower than 0.08...
         is_singular = true;
         const std::array<double, 42> jacobian_array = model.zeroJacobian(franka::Frame::kEndEffector, state);
         const Eigen::Matrix<double, 6, 7> jacobian(jacobian_array.data());
@@ -196,6 +199,12 @@ int main(int argc, char * argv[])
 
         wrench.force() = wrench_vector.head<3>();
         wrench.moment() = wrench_vector.tail<3>();
+
+        if(sensorAvailable)
+        {
+          auto & pandaSensor = controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName);
+          pandaSensor.set_singular_values(Svec);
+        }
         // LOG_SUCCESS("special force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "] and moment =[" << wrench.moment().x() << ", " << wrench.moment().y() << ", " << wrench.moment().z() << "]")
       }
 
@@ -207,7 +216,7 @@ int main(int argc, char * argv[])
       // }
 
       if(wrench.force().norm() > 30 && is_singular==false){
-        LOG_ERROR("stopping because wrench.force().norm() = " << wrench.force().norm())
+        mc_rtc::log::error("stopping because wrench.force().norm() = {}", wrench.force().norm())
         LOG_ERROR("force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "] and moment =[" << wrench.moment().x() << ", " << wrench.moment().y() << ", " << wrench.moment().z() << "]")
         return franka::MotionFinished(output_dq);
       }
@@ -222,6 +231,7 @@ int main(int argc, char * argv[])
         auto & pandaSensor = controller.robot().device<mc_panda::PandaSensor>(sensorDeviceName);
         pandaSensor.set_tau_ext_hat_filtered(state.tau_ext_hat_filtered);
         pandaSensor.set_O_F_ext_hat_K(state.O_F_ext_hat_K);
+        pandaSensor.set_K_F_ext_hat_K(state.K_F_ext_hat_K);
         pandaSensor.set_control_command_success_rate(state.control_command_success_rate);
         pandaSensor.set_m_ee(state.m_ee);
         pandaSensor.set_m_load(state.m_load);
