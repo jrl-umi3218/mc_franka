@@ -61,12 +61,13 @@ int main(int argc, char** argv) {
       counter++;
       time += period.toSec(); //->no noise
       // time += 0.001; //->creates noise
-      double factor = 100000.0;
-      std::cout << "period.toSec() - 0.001 = " << period.toSec()-0.001 << std::endl;
-      std::cout << "period.toMSec() - 1.0 = " << period.toMSec()-1.0 << std::endl;
-      std::cout << "period.toMSec()*1000.0 = " << period.toMSec()*1000.0 << std::endl;
-      std::cout << "time*factor = " << time*factor << std::endl;
-      double delta_angle = M_PI / 10.0 * (1 - std::cos(M_PI / 2.5 * time));
+      if(period.toSec() > 0.001 || period.toSec() < 0.001)
+      {
+        std::cout << counter << " => " << period.toSec() << std::endl;
+      }
+
+      // double delta_angle = M_PI / 30.0 * (1 - std::cos(M_PI / 0.25 * time)); //super fast motion
+      double delta_angle = M_PI / 30.0 * (1 - std::cos(M_PI / 2.5 * time)); //slow motion
 
       franka::JointPositions output = {{initial_position[0], 
                                         initial_position[1] + delta_angle,
