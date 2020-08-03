@@ -46,6 +46,8 @@ int main(int argc, char * argv[])
   void * data = init(argc, argv, cycle_ns);
   if(!data)
   {
+    printf("Initialization failed\n");
+    return -2;
   }
 
   /* Time reservation */
