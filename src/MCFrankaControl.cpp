@@ -1,3 +1,32 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <syscall.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+// Taken from /usr/include/linux/sched/types.h
+struct sched_attr {
+  uint32_t size;
+
+  uint32_t sched_policy;
+  uint64_t sched_flags;
+
+  /* SCHED_NORMAL, SCHED_BATCH */
+  int32_t sched_nice;
+
+  /* SCHED_FIFO, SCHED_RR */
+  uint32_t sched_priority;
+
+  /* SCHED_DEADLINE */
+  uint64_t sched_runtime;
+  uint64_t sched_deadline;
+  uint64_t sched_period;
+};
+
+
 #include <mc_control/mc_global_controller.h>
 
 #include <boost/program_options.hpp>
@@ -10,6 +39,11 @@ namespace po = boost::program_options;
 #include <condition_variable>
 #include <iostream>
 #include <thread>
+
+int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
+{
+  return syscall(__NR_sched_setattr, pid, attr, flags);
+}
 
 namespace mc_time
 {
@@ -24,9 +58,6 @@ using clock = typename std::conditional<std::chrono::high_resolution_clock::is_s
 
 #include "PandaControlType.h"
 
-std::condition_variable sensors_cv;
-std::mutex sensors_mutex;
-std::atomic<size_t> sensors_ready(0);
 std::condition_variable start_control_cv;
 std::mutex start_control_mutex;
 bool start_control_ready = false;
@@ -107,7 +138,7 @@ struct PandaControlLoop
     }
     control.control(robot, [
       this, &controller
-    ](const franka::RobotState & stateIn, franka::Duration) -> typename PandaControlType<cm>::ReturnT {
+    ](const franka::RobotState & stateIn, franka::Duration dt) -> typename PandaControlType<cm>::ReturnT {
       timespec tv;
       clock_gettime(CLOCK_REALTIME, &tv);
       control_t = tv.tv_sec + tv.tv_nsec * 1e-9;
@@ -117,23 +148,18 @@ struct PandaControlLoop
         started = true;
       }
       this->state = stateIn;
-      sensor_id += 1;
+      sensor_id += dt.toMSec();
       auto & robot = controller.controller().robots().robot(name);
       auto & real = controller.controller().realRobots().robot(name);
       if(sensor_id % steps == 0)
       {
-        if(control_id != 0 && control_id - 1 != prev_control_id)
+        if(control_id != prev_control_id + dt.toMSec())
         {
           mc_rtc::log::warning("[mc_franka] {} missed control data (previous control id: {}, control id: {})", name,
                                prev_control_id, control_id);
         }
         updateSensors(controller);
         prev_control_id = control_id;
-        sensors_ready++;
-        if(leader)
-        {
-          sensors_cv.notify_one();
-        }
       }
       if(controller.running)
       {
@@ -159,6 +185,13 @@ struct PandaControlLoop
 template<ControlMode cm>
 void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig)
 {
+  /* Lock memory */
+  if(mlockall(MCL_CURRENT|MCL_FUTURE) == -1)
+  {
+    printf("mlockall failed: %m\n");
+    std::exit(-2);
+  }
+
   auto frankaConfig = gconfig.config("Franka");
   auto ignoredRobots = frankaConfig("ignored", std::vector<std::string>{});
   mc_control::MCGlobalController controller(gconfig);
@@ -228,8 +261,6 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
     controller.controller().logger().addLogEntry(panda.first.name + "_control_t",
                                                  [&panda]() { return panda.first.control_t; });
   }
-  mc_time::duration_us mc_franka_dt{0};
-  controller.controller().logger().addLogEntry("perf_mc_franka", [&]() { return mc_franka_dt.count() / 1000; });
   controller.init(robots.robot().encoderValues());
   controller.running = true;
   controller.controller().gui()->addElement(
@@ -242,29 +273,24 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   }
   start_control_ready = true;
   start_control_cv.notify_all();
+  /** Setup scheduler to wake-up this thread at the required frequency */
+  uint64_t cycle_ns = 1e9 * controller.timestep();
+  struct sched_attr attr;
+  attr.sched_policy = SCHED_DEADLINE;
+  attr.sched_runtime = attr.sched_deadline = attr.sched_period = cycle_ns; // nanoseconds
+  /* Set scheduler policy */
+  if(sched_setattr(0, &attr, 0) < 0)
+  {
+    printf("sched_setattr failed: %m\n");
+    std::exit(2);
+  }
   size_t iter = 0;
   while(controller.running)
   {
-    auto start_t = mc_time::clock::now();
-    {
-      std::unique_lock<std::mutex> sensors_lock(sensors_mutex);
-      bool start_measure = false;
-      std::chrono::time_point<mc_time::clock> start;
-      sensors_cv.wait(sensors_lock);
-      sensors_ready = 0;
-      if(iter++ % (5 * freq) == 0 && pandas.size() > 1)
-      {
-        mc_time::duration_us delay = mc_time::clock::now() - start;
-        mc_rtc::log::info("[mc_franka] Measured delay between the pandas: {}us", delay.count());
-      }
-      for(auto & panda : pandas)
-      {
-        panda.second = panda.first.sensor_id;
-      }
-    }
     controller.run();
     control_id++;
-    mc_franka_dt = mc_time::clock::now() - start_t;
+    // Sleep until the next cycle
+    sched_yield();
   }
   for(auto & th : panda_threads)
   {
