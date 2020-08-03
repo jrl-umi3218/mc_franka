@@ -1,8 +1,11 @@
 # Sample configuration for a multi-robot connection
 Franka:
   ControlMode: Velocity # Can be: Position/Velocity/Torque
+  cpu: 3 # To which CPU mc_rtc thread will be pinned
   panda_default: # Name of the robot in the controller
     ip: 172.16.0.2 # IP associated to this robot
+    cpu: 1 # To which CPU the control thread will be pinned
   panda_2: # Name of the robot in the controller
     ip: 172.16.1.2
+    cpu: 2 # To which CPU the control thread will be pinned
   ignored: [env/door, env/box] # Ignored actuated robot that are not controlled via libfranka

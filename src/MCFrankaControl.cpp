@@ -1,32 +1,3 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <syscall.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-// Taken from /usr/include/linux/sched/types.h
-struct sched_attr {
-  uint32_t size;
-
-  uint32_t sched_policy;
-  uint64_t sched_flags;
-
-  /* SCHED_NORMAL, SCHED_BATCH */
-  int32_t sched_nice;
-
-  /* SCHED_FIFO, SCHED_RR */
-  uint32_t sched_priority;
-
-  /* SCHED_DEADLINE */
-  uint64_t sched_runtime;
-  uint64_t sched_deadline;
-  uint64_t sched_period;
-};
-
-
 #include <mc_control/mc_global_controller.h>
 
 #include <boost/program_options.hpp>
@@ -39,11 +10,6 @@ namespace po = boost::program_options;
 #include <condition_variable>
 #include <iostream>
 #include <thread>
-
-int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
-{
-  return syscall(__NR_sched_setattr, pid, attr, flags);
-}
 
 namespace mc_time
 {
@@ -62,6 +28,7 @@ std::condition_variable start_control_cv;
 std::mutex start_control_mutex;
 bool start_control_ready = false;
 size_t control_id = 0;
+std::vector<std::thread> panda_threads;
 
 template<ControlMode cm>
 struct PandaControlLoop
@@ -183,18 +150,12 @@ struct PandaControlLoop
 };
 
 template<ControlMode cm>
-void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig)
+void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & gconfig)
 {
-  /* Lock memory */
-  if(mlockall(MCL_CURRENT|MCL_FUTURE) == -1)
-  {
-    printf("mlockall failed: %m\n");
-    std::exit(-2);
-  }
-
   auto frankaConfig = gconfig.config("Franka");
   auto ignoredRobots = frankaConfig("ignored", std::vector<std::string>{});
-  mc_control::MCGlobalController controller(gconfig);
+  auto controller_ptr = new mc_control::MCGlobalController(gconfig);
+  auto & controller = *controller_ptr;
   if(controller.controller().timeStep < 0.001)
   {
     mc_rtc::log::error_and_throw<std::runtime_error>("mc_rtc cannot run faster than 1kHz with mc_franka");
@@ -266,25 +227,19 @@ void global_thread(mc_control::MCGlobalController::GlobalConfiguration & gconfig
   controller.controller().gui()->addElement(
       {"Franka"}, mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
   // Start panda control loops
-  std::vector<std::thread> panda_threads;
   for(auto & panda : pandas)
   {
     panda_threads.emplace_back([&panda, &controller]() { panda.first.control_thread(controller); });
   }
   start_control_ready = true;
   start_control_cv.notify_all();
-  /** Setup scheduler to wake-up this thread at the required frequency */
-  uint64_t cycle_ns = 1e9 * controller.timestep();
-  struct sched_attr attr;
-  attr.sched_policy = SCHED_DEADLINE;
-  attr.sched_runtime = attr.sched_deadline = attr.sched_period = cycle_ns; // nanoseconds
-  /* Set scheduler policy */
-  if(sched_setattr(0, &attr, 0) < 0)
-  {
-    printf("sched_setattr failed: %m\n");
-    std::exit(2);
-  }
-  size_t iter = 0;
+  return controller_ptr;
+}
+
+void run(void * data)
+{
+  auto controller_ptr = static_cast<mc_control::MCGlobalController *>(data);
+  auto & controller = *controller_ptr;
   while(controller.running)
   {
     controller.run();
@@ -305,10 +260,10 @@ struct GlobalControlLoop
   std::vector<PandaControlLoop<cm>> robots;
 };
 
-int main(int argc, char * argv[])
+void * init(int argc, char * argv[], uint64_t & cycle_ns)
 {
   std::string conf_file = "";
-  po::options_description desc("MCUDPControl options");
+  po::options_description desc("MCFrankaControl options");
   // clang-format off
   desc.add_options()
     ("help", "Display help message")
@@ -323,7 +278,7 @@ int main(int argc, char * argv[])
   {
     std::cout << desc << "\n";
     std::cout << "see etc/sample.yaml for libfranka configuration\n";
-    return 1;
+    return nullptr;
   }
 
   mc_control::MCGlobalController::GlobalConfiguration gconfig(conf_file, nullptr);
@@ -339,20 +294,17 @@ int main(int argc, char * argv[])
     switch(cm)
     {
       case ControlMode::Position:
-        global_thread<ControlMode::Position>(gconfig);
+        return global_thread_init<ControlMode::Position>(gconfig);
         break;
       case ControlMode::Velocity:
-        global_thread<ControlMode::Velocity>(gconfig);
-        break;
+        return global_thread_init<ControlMode::Velocity>(gconfig);
       case ControlMode::Torque:
-        global_thread<ControlMode::Torque>(gconfig);
-        break;
+        return global_thread_init<ControlMode::Torque>(gconfig);
     }
   }
   catch(const franka::Exception & e)
   {
     std::cerr << "franka::Exception " << e.what() << "\n";
-    return 1;
+    return nullptr;
   }
-  return 0;
 }
