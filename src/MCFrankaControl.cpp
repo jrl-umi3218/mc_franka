@@ -149,13 +149,26 @@ struct PandaControlLoop
   bool leader = false;
 };
 
+struct ControlLoopDataBase
+{
+  ControlMode mode;
+  mc_control::MCGlobalController * controller;
+};
+
+template<ControlMode cm>
+struct ControlLoopData : public ControlLoopDataBase
+{
+  std::vector<std::pair<PandaControlLoop<cm>, size_t>> * pandas;
+};
+
 template<ControlMode cm>
 void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & gconfig)
 {
   auto frankaConfig = gconfig.config("Franka");
   auto ignoredRobots = frankaConfig("ignored", std::vector<std::string>{});
-  auto controller_ptr = new mc_control::MCGlobalController(gconfig);
-  auto & controller = *controller_ptr;
+  auto loop_data = new ControlLoopData<cm>();
+  loop_data->controller = new mc_control::MCGlobalController(gconfig);
+  auto & controller = *loop_data->controller;
   if(controller.controller().timeStep < 0.001)
   {
     mc_rtc::log::error_and_throw<std::runtime_error>("mc_rtc cannot run faster than 1kHz with mc_franka");
@@ -171,7 +184,8 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
     controller.realRobots().robots().back().name(robots.robot(i).name());
   }
   // Initialize controlled panda robot
-  std::vector<std::pair<PandaControlLoop<cm>, size_t>> pandas;
+  loop_data->pandas = new std::vector<std::pair<PandaControlLoop<cm>, size_t>>();
+  auto & pandas = *loop_data->pandas;
   {
     std::vector<std::thread> panda_init_threads;
     std::mutex pandas_init_mutex;
@@ -233,12 +247,13 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   }
   start_control_ready = true;
   start_control_cv.notify_all();
-  return controller_ptr;
+  return loop_data;
 }
 
 void run(void * data)
 {
-  auto controller_ptr = static_cast<mc_control::MCGlobalController *>(data);
+  auto control_data = static_cast<ControlLoopDataBase *>(data);
+  auto controller_ptr = control_data->controller;
   auto & controller = *controller_ptr;
   while(controller.running)
   {
@@ -251,14 +266,17 @@ void run(void * data)
   {
     th.join();
   }
+  switch(control_data->mode)
+  {
+    case ControlMode::Position:
+      delete static_cast<ControlLoopData<ControlMode::Position>*>(data)->pandas;
+    case ControlMode::Velocity:
+      delete static_cast<ControlLoopData<ControlMode::Velocity>*>(data)->pandas;
+    case ControlMode::Torque:
+      delete static_cast<ControlLoopData<ControlMode::Torque>*>(data)->pandas;
+  }
+  delete controller_ptr;
 }
-
-template<ControlMode cm>
-struct GlobalControlLoop
-{
-  mc_control::MCGlobalController & controller;
-  std::vector<PandaControlLoop<cm>> robots;
-};
 
 void * init(int argc, char * argv[], uint64_t & cycle_ns)
 {
