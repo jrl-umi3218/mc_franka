@@ -95,6 +95,9 @@ struct PandaControlLoop
     }
     robot.forwardKinematics();
     real.mbc() = robot.mbc();
+    timespec tv;
+    clock_gettime(CLOCK_REALTIME, &tv);
+    control_t = tv.tv_sec + tv.tv_nsec * 1e-9;
   }
 
   void control_thread(mc_control::MCGlobalController & controller)
@@ -122,8 +125,9 @@ struct PandaControlLoop
       {
         if(control_id != prev_control_id + dt.toMSec())
         {
-          mc_rtc::log::warning("[mc_franka] {} missed control data (previous control id: {}, control id: {})", name,
-                               prev_control_id, control_id);
+          mc_rtc::log::warning(
+              "[mc_franka] {} missed control data (previous control id: {}, control id: {}, expected: {})", name,
+              prev_control_id, control_id, prev_control_id + dt.toMSec());
         }
         updateSensors(controller);
         prev_control_id = control_id;
@@ -232,7 +236,8 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   for(auto & panda : pandas)
   {
     panda.first.init(controller);
-    controller.controller().logger().addLogEntry(panda.first.name + "_sensors_id", [&panda]() { return panda.second; });
+    controller.controller().logger().addLogEntry(panda.first.name + "_sensors_id",
+                                                 [&panda]() { return panda.sensor_id; });
     controller.controller().logger().addLogEntry(panda.first.name + "_control_t",
                                                  [&panda]() { return panda.first.control_t; });
   }
@@ -269,11 +274,11 @@ void run(void * data)
   switch(control_data->mode)
   {
     case ControlMode::Position:
-      delete static_cast<ControlLoopData<ControlMode::Position>*>(data)->pandas;
+      delete static_cast<ControlLoopData<ControlMode::Position> *>(data)->pandas;
     case ControlMode::Velocity:
-      delete static_cast<ControlLoopData<ControlMode::Velocity>*>(data)->pandas;
+      delete static_cast<ControlLoopData<ControlMode::Velocity> *>(data)->pandas;
     case ControlMode::Torque:
-      delete static_cast<ControlLoopData<ControlMode::Torque>*>(data)->pandas;
+      delete static_cast<ControlLoopData<ControlMode::Torque> *>(data)->pandas;
   }
   delete controller_ptr;
 }
