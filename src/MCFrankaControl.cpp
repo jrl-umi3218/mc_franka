@@ -260,8 +260,18 @@ void run(void * data)
   auto control_data = static_cast<ControlLoopDataBase *>(data);
   auto controller_ptr = control_data->controller;
   auto & controller = *controller_ptr;
+  timespec tv;
+  clock_gettime(CLOCK_REALTIME, &tv);
+  // Current time in milliseconds
+  double current_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6;
+  // Will record the time that passed between two runs
+  double elapsed_t = 0;
+  controller.controller().logger().addLogEntry("mc_franka_delay", [&elapsed_t]() { return elapsed_t; });
   while(controller.running)
   {
+    clock_gettime(CLOCK_REALTIME, &tv);
+    elapsed_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6 - current_t;
+    current_t = elapsed_t + current_t;
     controller.run();
     control_id++;
     // Sleep until the next cycle
