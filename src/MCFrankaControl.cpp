@@ -237,7 +237,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   {
     panda.first.init(controller);
     controller.controller().logger().addLogEntry(panda.first.name + "_sensors_id",
-                                                 [&panda]() { return panda.sensor_id; });
+                                                 [&panda]() { return panda.first.sensor_id; });
     controller.controller().logger().addLogEntry(panda.first.name + "_control_t",
                                                  [&panda]() { return panda.first.control_t; });
   }
