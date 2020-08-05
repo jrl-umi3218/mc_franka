@@ -99,9 +99,9 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   controller.controller().gui()->addElement(
       {"Franka"}, mc_rtc::gui::Button("Stop controller", [&controller]() { controller.running = false; }));
   // Start panda control loops
-  std::mutex startMutex;
-  std::condition_variable startCV;
-  bool startControl = false;
+  static std::mutex startMutex;
+  static std::condition_variable startCV;
+  static bool startControl = false;
   for(auto & panda : pandas)
   {
     loop_data->panda_threads->emplace_back(
@@ -160,13 +160,10 @@ void run(void * data)
   switch(control_data->mode)
   {
     case ControlMode::Position:
-      mc_rtc::log::details::cerr().critical("[mc_franka] run_impl<ControlMode::Position>");
       return run_impl<ControlMode::Position>(data);
     case ControlMode::Velocity:
-      mc_rtc::log::details::cerr().critical("[mc_franka] run_impl<ControlMode::Velocity>");
       return run_impl<ControlMode::Velocity>(data);
     case ControlMode::Torque:
-      mc_rtc::log::details::cerr().critical("[mc_franka] run_impl<ControlMode::Torque>");
       return run_impl<ControlMode::Torque>(data);
   }
 }
@@ -205,13 +202,10 @@ void * init(int argc, char * argv[], uint64_t & cycle_ns)
     switch(cm)
     {
       case ControlMode::Position:
-        mc_rtc::log::details::cerr().critical("[mc_franka] init_impl<ControlMode::Position>");
         return global_thread_init<ControlMode::Position>(gconfig);
       case ControlMode::Velocity:
-        mc_rtc::log::details::cerr().critical("[mc_franka] init_impl<ControlMode::Velocity>");
         return global_thread_init<ControlMode::Velocity>(gconfig);
       case ControlMode::Torque:
-        mc_rtc::log::details::cerr().critical("[mc_franka] init_impl<ControlMode::Torque>");
         return global_thread_init<ControlMode::Torque>(gconfig);
     }
   }
