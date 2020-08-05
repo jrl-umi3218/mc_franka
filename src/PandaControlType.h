@@ -1,3 +1,5 @@
+/* Copyright 2020 mc_rtc development team */
+
 #pragma once
 
 #include <mc_rbdyn/Robot.h>
@@ -7,6 +9,14 @@
 
 #include "ControlMode.h"
 
+namespace mc_franka
+{
+
+/** PandaControlType implements a control callback for libfranka
+ *
+ * Depending on ControlMode the callback will provide position, velocity or
+ * torques commands to the robot
+ */
 template<ControlMode cm>
 struct PandaControlType
 {
@@ -94,3 +104,5 @@ struct PandaControlType<ControlMode::Torque> : public franka::Torques
     robot.control(cb, true, 1000);
   }
 };
+
+} // namespace mc_franka

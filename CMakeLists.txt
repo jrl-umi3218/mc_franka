@@ -7,7 +7,17 @@ find_package(Franka REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(mc_panda REQUIRED)
 
-add_executable(MCFrankaControl src/MCFrankaControl.cpp src/main.cpp)
+set(MCFrankaControl_SRC
+  src/ControlMode.h
+  src/defs.h
+  src/main.cpp
+  src/MCFrankaControl.cpp
+  src/PandaControlLoop.h
+  src/PandaControlType.h
+  src/thread.h
+)
+
+add_executable(MCFrankaControl ${MCFrankaControl_SRC})
 target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka Boost::program_options mc_panda::devices)
 
 install(TARGETS MCFrankaControl DESTINATION bin)

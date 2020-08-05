@@ -1,6 +1,4 @@
-/*
- * Copyright 2019-2020 mc_rtc development team
- */
+/* Copyright 2020 mc_rtc development team */
 
 #include <linux/sched.h>
 #include <linux/sched/types.h>
@@ -8,14 +6,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syscall.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <syscall.h>
 #include <unistd.h>
 
 #include "thread.h"
 
-int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
+int sched_setattr(pid_t pid, const struct sched_attr * attr, unsigned int flags)
 {
   return syscall(__NR_sched_setattr, pid, attr, flags);
 }
@@ -25,7 +23,7 @@ int main(int argc, char * argv[])
   struct sched_attr attr;
 
   /* Lock memory */
-  if(mlockall(MCL_CURRENT|MCL_FUTURE) == -1)
+  if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1)
   {
     printf("mlockall failed: %m\n");
     return -2;
@@ -43,7 +41,7 @@ int main(int argc, char * argv[])
   }
 
   /* Initialize callback (non real-time yet) */
-  void * data = init(argc, argv, cycle_ns);
+  void * data = mc_franka::init(argc, argv, cycle_ns);
   if(!data)
   {
     printf("Initialization failed\n");
@@ -64,7 +62,7 @@ int main(int argc, char * argv[])
   }
 
   /* Run */
-  run(data);
+  mc_franka::run(data);
 
   return 0;
 }

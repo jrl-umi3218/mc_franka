@@ -1,7 +1,12 @@
+/* Copyright 2020 mc_rtc development team */
+
 #pragma once
 
 #include <mc_rtc/Configuration.h>
 #include <mc_rtc/logging.h>
+
+namespace mc_franka
+{
 
 enum class ControlMode
 {
@@ -9,25 +14,26 @@ enum class ControlMode
   Velocity,
   Torque
 };
+}
 
 namespace mc_rtc
 {
 
 template<>
-struct ConfigurationLoader<ControlMode>
+struct ConfigurationLoader<mc_franka::ControlMode>
 {
-  static Configuration save(const ControlMode & cm)
+  static Configuration save(const mc_franka::ControlMode & cm)
   {
     Configuration c;
     switch(cm)
     {
-      case ControlMode::Position:
+      case mc_franka::ControlMode::Position:
         c.add("cm", "Position");
         break;
-      case ControlMode::Velocity:
+      case mc_franka::ControlMode::Velocity:
         c.add("cm", "Velocity");
         break;
-      case ControlMode::Torque:
+      case mc_franka::ControlMode::Torque:
         c.add("cm", "Torque");
         break;
       default:
@@ -36,20 +42,20 @@ struct ConfigurationLoader<ControlMode>
     return c("cm");
   }
 
-  static ControlMode load(const Configuration & conf)
+  static mc_franka::ControlMode load(const Configuration & conf)
   {
     std::string cm = conf;
     if(cm == "Position")
     {
-      return ControlMode::Position;
+      return mc_franka::ControlMode::Position;
     }
     if(cm == "Velocity")
     {
-      return ControlMode::Velocity;
+      return mc_franka::ControlMode::Velocity;
     }
     if(cm == "Torque")
     {
-      return ControlMode::Torque;
+      return mc_franka::ControlMode::Torque;
     }
     log::error_and_throw<std::runtime_error>("ControlMode has unexpected value {}", cm);
   }
