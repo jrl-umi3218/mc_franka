@@ -158,6 +158,7 @@ void PandaControlLoop<cm>::controlThread(mc_control::MCGlobalController & contro
         std::unique_lock<std::mutex> senLock(updateSensorsMutex_);
         auto now = clock::now();
         delay_ = duration_ms(now - start_t).count();
+        start_t = now;
         state_ = stateIn;
         sensor_id_ += dt.toMSec();
         if(sensor_id_ % steps_ == 0)
