@@ -167,6 +167,7 @@ void PandaControlLoop<cm>::controlThread(mc_control::MCGlobalController & contro
             mc_rtc::log::warning("[mc_franka] {} missed control data (previous: {}, current: {}, expected: {}", name_,
                                  prev_control_id_, control_id_, prev_control_id_ + dt.toMSec());
           }
+          prev_control_id_ = control_id_;
         }
         if(running)
         {
