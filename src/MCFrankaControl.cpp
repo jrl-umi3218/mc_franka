@@ -10,6 +10,7 @@ namespace mc_franka
 
 struct ControlLoopDataBase
 {
+  ControlLoopDataBase(ControlMode cm) : mode(cm), controller(nullptr), panda_threads(nullptr) {}
   ControlMode mode;
   mc_control::MCGlobalController * controller;
   std::vector<std::thread> * panda_threads;
@@ -18,6 +19,7 @@ struct ControlLoopDataBase
 template<ControlMode cm>
 struct ControlLoopData : public ControlLoopDataBase
 {
+  ControlLoopData() : ControlLoopDataBase(cm), pandas(nullptr) {}
   std::vector<PandaControlLoopPtr<cm>> * pandas;
 };
 
