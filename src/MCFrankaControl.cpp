@@ -148,7 +148,7 @@ int main(int argc, char * argv[])
     bool is_singular = false;;
     franka::Model model = robot.loadModel();
     franka::JointVelocities output_dq(state.dq);
-    robot.control([&print_data,&model,&controller,&sensorAvailable,&sensorDeviceName,&q_vector,&dq_vector,&tau_vector,&dtau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration) -> franka::JointVelocities
+    robot.control([&print_data,&model,&controller,&sensorAvailable,&sensorDeviceName,&q_vector,&dq_vector,&tau_vector,&dtau_vector,&wrench,&wrenches,&is_singular,&output_dq](const franka::RobotState & state, franka::Duration period) -> franka::JointVelocities
     {
       if(sensorAvailable)
       {
@@ -185,6 +185,8 @@ int main(int argc, char * argv[])
         Eigen::JacobiSVD<Eigen::Matrix<double, 7, 6>> svdT = Eigen::JacobiSVD<Eigen::Matrix<double, 7, 6>>();
         svdT.compute(jacobian.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
         // const Eigen::VectorXd wrench_vector = svdT.solve(torques); //this solution maybe faster, but does not correspond to the libfranka wrenches for full-rank Jacobian
+        const double rank_ = svdT.rank();
+        mc_rtc::log::warning("rank_ = {}", rank_);
         const Eigen::MatrixXd U = svdT.matrixU();
         const Eigen::MatrixXd V = svdT.matrixV();
         const Eigen::VectorXd Svec  = svdT.singularValues();
@@ -215,7 +217,7 @@ int main(int argc, char * argv[])
       //   LOG_INFO("force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "] and moment =[" << wrench.moment().x() << ", " << wrench.moment().y() << ", " << wrench.moment().z() << "]")
       // }
 
-      if(wrench.force().norm() > 30 && is_singular==false){
+      if(wrench.force().norm() > 230 && is_singular==false){
         mc_rtc::log::error("stopping because wrench.force().norm() = {}", wrench.force().norm())
         LOG_ERROR("force = [" << wrench.force().x() << ", " << wrench.force().y() << ", " << wrench.force().z() << "] and moment =[" << wrench.moment().x() << ", " << wrench.moment().y() << ", " << wrench.moment().z() << "]")
         return franka::MotionFinished(output_dq);
@@ -237,6 +239,11 @@ int main(int argc, char * argv[])
         pandaSensor.set_m_load(state.m_load);
         pandaSensor.set_joint_contact(state.joint_contact);
         pandaSensor.set_cartesian_contact(state.cartesian_contact);
+        // pandaSensor.set_singular_values();
+        pandaSensor.set_joint_positions(state.q);
+        pandaSensor.set_joint_velocities(state.dq);
+        pandaSensor.set_joint_torques(state.tau_J);
+        pandaSensor.set_joint_dtorques(state.dtau_J);
       }
 
       if(controller.running && controller.run())
@@ -263,7 +270,9 @@ int main(int argc, char * argv[])
     // }, franka::ControllerMode::kJointImpedance, true, 100); //default parameters
     }, franka::ControllerMode::kJointImpedance, true, 1000); //increased kDefaultCutoffFrequency 
 
+    mc_rtc::log::info("libfranka control loop has ended, stopping the robot now.");
     robot.stop();
+    mc_rtc::log::info("panda succesfully stopped");
   }
   catch(const franka::Exception & e)
   {
@@ -271,9 +280,10 @@ int main(int argc, char * argv[])
     std::cerr << "franka::Exception " << e.what() << "\n";
     // return 1;
   }
-
+  mc_rtc::log::info("stop the print thread");
   if (print_thread.joinable()) {
     print_thread.join();
   }
+  mc_rtc::log::info("Good bye");
   return 0;
 }
