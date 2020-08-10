@@ -2,6 +2,8 @@
 
 #include "PandaControlLoop.h"
 
+#include <mc_panda/devices/Pump.h>
+
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
@@ -72,7 +74,17 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
             std::unique_lock<std::mutex> lock(pandas_init_mutex);
             pandas_init_cv.wait(lock, [&pandas_init_ready]() { return pandas_init_ready; });
           }
-          auto panda = std::unique_ptr<PandaControlLoop<cm>>(new PandaControlLoop<cm>(robot.name(), ip, n_steps));
+          mc_panda::Pump * pump = nullptr;
+          if(robot.template hasDevice<mc_panda::Pump>("Pump"))
+          {
+            auto & pumpRef = robot.template device<mc_panda::Pump>("Pump");
+            pump = &pumpRef;
+          }
+          auto panda = std::unique_ptr<PandaControlLoop<cm>>(new PandaControlLoop<cm>(robot.name(), ip, n_steps, pump));
+          if(pump)
+          {
+            pump->addToLogger(controller.controller().logger());
+          }
           std::unique_lock<std::mutex> lock(pandas_init_mutex);
           pandas.emplace_back(std::move(panda));
         });

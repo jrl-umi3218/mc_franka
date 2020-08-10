@@ -5,6 +5,8 @@
 #include "PandaControlType.h"
 #include "defs.h"
 
+#include <mc_panda/devices/Pump.h>
+
 #include <mc_control/mc_global_controller.h>
 
 #include <condition_variable>
@@ -32,7 +34,7 @@ struct PandaControlLoop
    * \param steps How often the robot should get updated, 1 means every step, 2
    * means every 2 steps...
    */
-  PandaControlLoop(const std::string & name, const std::string & ip, size_t steps);
+  PandaControlLoop(const std::string & name, const std::string & ip, size_t steps, mc_panda::Pump * pump);
 
   /** Initialize mc_rtc robot from the current state */
   void init(mc_control::MCGlobalController & controller);
@@ -87,7 +89,7 @@ template<ControlMode cm>
 using PandaControlLoopPtr = std::unique_ptr<PandaControlLoop<cm>>;
 
 template<ControlMode cm>
-PandaControlLoop<cm>::PandaControlLoop(const std::string & name, const std::string & ip, size_t steps)
+PandaControlLoop<cm>::PandaControlLoop(const std::string & name, const std::string & ip, size_t steps, mc_panda::Pump * pump)
 : name_(name), robot_(ip), state_(robot_.readOnce()), control_(state_), steps_(steps),
   logger_(mc_rtc::Logger::Policy::THREADED, "/tmp", "mc-franka-" + name_)
 {
@@ -95,6 +97,12 @@ PandaControlLoop<cm>::PandaControlLoop(const std::string & name, const std::stri
   auto now = clock::now();
   duration_us dt = now - panda_init_t;
   mc_rtc::log::info("[mc_franka] Elapsed time since the creation of another PandaControlLoop: {}us", dt.count());
+  if(pump)
+  {
+    pump->name(name + "_Pump");
+    pump->connect(ip);
+    pump->addToLogger(logger_);
+  }
 }
 
 template<ControlMode cm>
