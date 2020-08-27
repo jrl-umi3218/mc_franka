@@ -80,7 +80,7 @@ int main(int argc, char * argv[])
     // Start the sense-actuate loop
     auto & pumpDevice = controller.robot().device<mc_panda::Pump>(pumpDeviceName);
     franka::VacuumGripperState stateSucker;
-    mc_panda::NextPumpCommand nc;
+    // mc_panda::NextPumpCommand nc;
     bool looping = true;
     int counter=0;
     while(looping)
@@ -92,62 +92,62 @@ int main(int argc, char * argv[])
 
       //forward sucker sensor signals to mc_rtc
       stateSucker = sucker->readOnce();
-      pumpDevice.set_in_control_range(stateSucker.in_control_range);
-      pumpDevice.set_part_detached(stateSucker.part_detached);
-      pumpDevice.set_part_present(stateSucker.part_present);
-      if(stateSucker.device_status==franka::VacuumGripperDeviceStatus::kGreen){
-        pumpDevice.set_device_status_ok(true);
-      }
-      else{
-        pumpDevice.set_device_status_ok(false);
-      }
-      pumpDevice.set_actual_power(stateSucker.actual_power);
-      pumpDevice.set_vacuum(stateSucker.vacuum);
+      // pumpDevice.set_in_control_range(stateSucker.in_control_range);
+      // pumpDevice.set_part_detached(stateSucker.part_detached);
+      // pumpDevice.set_part_present(stateSucker.part_present);
+      // if(stateSucker.device_status==franka::VacuumGripperDeviceStatus::kGreen){
+      //   pumpDevice.set_device_status_ok(true);
+      // }
+      // else{
+      //   pumpDevice.set_device_status_ok(false);
+      // }
+      // pumpDevice.set_actual_power(stateSucker.actual_power);
+      // pumpDevice.set_vacuum(stateSucker.vacuum);
 
-      //receive sucker actuator commands from mc_rtc
-      nc = pumpDevice.NextPumpCommandRequested();
-      switch(nc)
-      {
-        case mc_panda::NextPumpCommand::None:
-        {
-          mc_rtc::log::info("no command requested");
-          break;
-        }
-        case mc_panda::NextPumpCommand::Vacuum:
-        {
-          mc_rtc::log::info("vacuum command requested");
-          uint8_t vacuum;
-          std::chrono::milliseconds timeout;
-          pumpDevice.getVacuumCommandParams(vacuum, timeout);
-          const bool vacuumOK = sucker->vacuum(vacuum, timeout);
-          pumpDevice.setVacuumCommandResult(vacuumOK);
-          mc_rtc::log::info("vacuum command applied with the params vacuum {} and timeout {}, result: {}", std::to_string(vacuum), std::to_string(timeout.count()), vacuumOK);
-          break;
-        }
-        case mc_panda::NextPumpCommand::Dropoff:
-        {
-          mc_rtc::log::info("dropoff command requested");
-          std::chrono::milliseconds timeout;
-          pumpDevice.getDropoffCommandParam(timeout);
-          const bool dropoffOK = sucker->dropOff(timeout);
-          pumpDevice.setDropoffCommandResult(dropoffOK);
-          mc_rtc::log::info("dropoff command applied with the param timeout {}, result: {}", std::to_string(timeout.count()), dropoffOK);
-          break;
-        }
-        case mc_panda::NextPumpCommand::Stop:
-        {
-          mc_rtc::log::info("stop command requested");
-          const bool stopOK = sucker->stop();
-          pumpDevice.setStopCommandResult(stopOK);
-          mc_rtc::log::info("stop command applied, result: {}", stopOK);
-          looping = false;
-          break;
-        }
-        default:
-        {
-          mc_rtc::log::error_and_throw<std::runtime_error>("next command has unexpected value");
-        }
-      }
+      // //receive sucker actuator commands from mc_rtc
+      // nc = pumpDevice.NextPumpCommandRequested();
+      // switch(nc)
+      // {
+      //   case mc_panda::NextPumpCommand::None:
+      //   {
+      //     mc_rtc::log::info("no command requested");
+      //     break;
+      //   }
+      //   case mc_panda::NextPumpCommand::Vacuum:
+      //   {
+      //     mc_rtc::log::info("vacuum command requested");
+      //     uint8_t vacuum;
+      //     std::chrono::milliseconds timeout;
+      //     pumpDevice.getVacuumCommandParams(vacuum, timeout);
+      //     const bool vacuumOK = sucker->vacuum(vacuum, timeout);
+      //     pumpDevice.setVacuumCommandResult(vacuumOK);
+      //     mc_rtc::log::info("vacuum command applied with the params vacuum {} and timeout {}, result: {}", std::to_string(vacuum), std::to_string(timeout.count()), vacuumOK);
+      //     break;
+      //   }
+      //   case mc_panda::NextPumpCommand::Dropoff:
+      //   {
+      //     mc_rtc::log::info("dropoff command requested");
+      //     std::chrono::milliseconds timeout;
+      //     pumpDevice.getDropoffCommandParam(timeout);
+      //     const bool dropoffOK = sucker->dropOff(timeout);
+      //     pumpDevice.setDropoffCommandResult(dropoffOK);
+      //     mc_rtc::log::info("dropoff command applied with the param timeout {}, result: {}", std::to_string(timeout.count()), dropoffOK);
+      //     break;
+      //   }
+      //   case mc_panda::NextPumpCommand::Stop:
+      //   {
+      //     mc_rtc::log::info("stop command requested");
+      //     const bool stopOK = sucker->stop();
+      //     pumpDevice.setStopCommandResult(stopOK);
+      //     mc_rtc::log::info("stop command applied, result: {}", stopOK);
+      //     looping = false;
+      //     break;
+      //   }
+      //   default:
+      //   {
+      //     mc_rtc::log::error_and_throw<std::runtime_error>("next command has unexpected value");
+      //   }
+      // }
     }
     robot.stop();
   }
