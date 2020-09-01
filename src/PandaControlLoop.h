@@ -209,6 +209,15 @@ void PandaControlLoop<cm>::updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robo
   updateSensor(&mc_rbdyn::Robot::encoderValues, &mc_rbdyn::Robot::encoderValues, state_.q);
   updateSensor(&mc_rbdyn::Robot::encoderVelocities, &mc_rbdyn::Robot::encoderVelocities, state_.dq);
   updateSensor(&mc_rbdyn::Robot::jointTorques, &mc_rbdyn::Robot::jointTorques, state_.tau_J);
+  auto wrench = sva::ForceVecd::Zero();
+  wrench.force().x() = state_.K_F_ext_hat_K[0];
+  wrench.force().y() = state_.K_F_ext_hat_K[1];
+  wrench.force().z() = state_.K_F_ext_hat_K[2];
+  wrench.couple().x() = state_.K_F_ext_hat_K[3];
+  wrench.couple().y() = state_.K_F_ext_hat_K[4];
+  wrench.couple().z() = state_.K_F_ext_hat_K[5];
+  robot.forceSensor("LeftHandForceSensor").wrench(wrench);
+  real.forceSensor("LeftHandForceSensor").wrench(wrench);
 }
 
 } // namespace mc_franka
