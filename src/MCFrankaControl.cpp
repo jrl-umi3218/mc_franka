@@ -2,6 +2,7 @@
 
 #include "PandaControlLoop.h"
 
+#include <mc_panda/devices/PandaDevice.h>
 #include <mc_panda/devices/Pump.h>
 
 #include <boost/program_options.hpp>
@@ -80,7 +81,9 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
             auto & pumpRef = robot.template device<mc_panda::Pump>("Pump");
             pump = &pumpRef;
           }
-          auto panda = std::unique_ptr<PandaControlLoop<cm>>(new PandaControlLoop<cm>(robot.name(), ip, n_steps, pump));
+          auto & device = robot.template device<mc_panda::PandaDevice>(mc_panda::PandaDevice::name);
+          auto panda = std::unique_ptr<PandaControlLoop<cm>>(new PandaControlLoop<cm>(robot.name(), ip, n_steps, device, pump));
+          device.addToLogger(controller.controller().logger(), robot.name());
           if(pump)
           {
             pump->addToLogger(controller.controller().logger());

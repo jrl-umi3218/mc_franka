@@ -5,6 +5,7 @@
 #include "PandaControlType.h"
 #include "defs.h"
 
+#include <mc_panda/devices/PandaDevice.h>
 #include <mc_panda/devices/Pump.h>
 
 #include <mc_control/mc_global_controller.h>
@@ -33,8 +34,16 @@ struct PandaControlLoop
    *
    * \param steps How often the robot should get updated, 1 means every step, 2
    * means every 2 steps...
+   *
+   * \param device PandaDevice associated to the robot
+   *
+   * \param pump Pump associated to the robot (nullptr if none)
    */
-  PandaControlLoop(const std::string & name, const std::string & ip, size_t steps, mc_panda::Pump * pump);
+  PandaControlLoop(const std::string & name,
+                   const std::string & ip,
+                   size_t steps,
+                   mc_panda::PandaDevice & device,
+                   mc_panda::Pump * pump);
 
   /** Initialize mc_rtc robot from the current state */
   void init(mc_control::MCGlobalController & controller);
@@ -70,6 +79,7 @@ private:
   franka::Robot robot_;
   franka::RobotState state_;
   PandaControlType<cm> control_;
+  mc_panda::PandaDevice & device_;
   size_t steps_ = 1;
   mc_rtc::Logger logger_;
   size_t sensor_id_ = 0;
@@ -89,8 +99,12 @@ template<ControlMode cm>
 using PandaControlLoopPtr = std::unique_ptr<PandaControlLoop<cm>>;
 
 template<ControlMode cm>
-PandaControlLoop<cm>::PandaControlLoop(const std::string & name, const std::string & ip, size_t steps, mc_panda::Pump * pump)
-: name_(name), robot_(ip), state_(robot_.readOnce()), control_(state_), steps_(steps),
+PandaControlLoop<cm>::PandaControlLoop(const std::string & name,
+                                       const std::string & ip,
+                                       size_t steps,
+                                       mc_panda::PandaDevice & device,
+                                       mc_panda::Pump * pump)
+: name_(name), robot_(ip), state_(robot_.readOnce()), control_(state_), device_(device), steps_(steps),
   logger_(mc_rtc::Logger::Policy::THREADED, "/tmp", "mc-franka-" + name_)
 {
   static auto panda_init_t = clock::now();
@@ -103,6 +117,8 @@ PandaControlLoop<cm>::PandaControlLoop(const std::string & name, const std::stri
     pump->connect(ip);
     pump->addToLogger(logger_);
   }
+  device.connect(&robot_);
+  device.addToLogger(logger_, name);
 }
 
 template<ControlMode cm>
@@ -218,6 +234,7 @@ void PandaControlLoop<cm>::updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robo
   wrench.couple().z() = state_.K_F_ext_hat_K[5];
   robot.forceSensor("LeftHandForceSensor").wrench(wrench);
   real.forceSensor("LeftHandForceSensor").wrench(wrench);
+  device_.state(state_);
 }
 
 } // namespace mc_franka
