@@ -5,7 +5,7 @@
 #include "PandaControlType.h"
 #include "defs.h"
 
-#include <mc_panda/devices/PandaDevice.h>
+#include <mc_panda/devices/Robot.h>
 #include <mc_panda/devices/Pump.h>
 
 #include <mc_control/mc_global_controller.h>
@@ -42,7 +42,7 @@ struct PandaControlLoop
   PandaControlLoop(const std::string & name,
                    const std::string & ip,
                    size_t steps,
-                   mc_panda::PandaDevice & device,
+                   mc_panda::Robot & device,
                    mc_panda::Pump * pump);
 
   /** Initialize mc_rtc robot from the current state */
@@ -79,7 +79,7 @@ private:
   franka::Robot robot_;
   franka::RobotState state_;
   PandaControlType<cm> control_;
-  mc_panda::PandaDevice & device_;
+  mc_panda::Robot & device_;
   size_t steps_ = 1;
   mc_rtc::Logger logger_;
   size_t sensor_id_ = 0;
@@ -102,7 +102,7 @@ template<ControlMode cm>
 PandaControlLoop<cm>::PandaControlLoop(const std::string & name,
                                        const std::string & ip,
                                        size_t steps,
-                                       mc_panda::PandaDevice & device,
+                                       mc_panda::Robot & device,
                                        mc_panda::Pump * pump)
 : name_(name), robot_(ip), state_(robot_.readOnce()), control_(state_), device_(device), steps_(steps),
   logger_(mc_rtc::Logger::Policy::THREADED, "/tmp", "mc-franka-" + name_)
@@ -113,9 +113,8 @@ PandaControlLoop<cm>::PandaControlLoop(const std::string & name,
   mc_rtc::log::info("[mc_franka] Elapsed time since the creation of another PandaControlLoop: {}us", dt.count());
   if(pump)
   {
-    pump->name(name + "_Pump");
     pump->connect(ip);
-    pump->addToLogger(logger_);
+    pump->addToLogger(logger_, name);
   }
   device.connect(&robot_);
   device.addToLogger(logger_, name);
