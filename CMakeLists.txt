@@ -18,4 +18,13 @@ set(MCFrankaControl_SRC
 add_executable(MCFrankaControl ${MCFrankaControl_SRC})
 target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka Boost::program_options mc_panda::devices)
 
+macro(add_panda_util NAME)
+  add_executable(${NAME} src/${NAME}.cpp)
+  target_link_libraries(${NAME} PUBLIC Franka::Franka)
+  install(TARGETS ${NAME} DESTINATION bin)
+endmacro()
+
+add_panda_util(PrintPandaState)
+add_panda_util(StopPandaPump)
+
 install(TARGETS MCFrankaControl DESTINATION bin)
