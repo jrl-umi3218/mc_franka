@@ -1,36 +1,66 @@
 mc_franka
 ==
 
-Interface between [libfranka] and [mc_rtc]
+[![License](https://img.shields.io/badge/License-BSD%202--Clause-green.svg)](https://opensource.org/licenses/BSD-2-Clause)
+[![CI](https://github.com/jrl-umi3218/mc_franka/workflows/CI%20of%20mc_franka/badge.svg?branch=master)](https://github.com/jrl-umi3218/mc_franka/actions?query=workflow%3A%22CI+of+mc_franka%22)
 
-Installation
+Interface between [libfranka] and [mc_rtc]. It provides multi-robot support and connect [mc_panda] devices to their [libfranka] counterpart.
+
+Dependencies
+------------
+
+This package requires:
+- [mc_panda]
+
+You will also need the `linux-libc-dev` package on Ubuntu and Debian systems.
+
+Usage
 --
 
-1. Install [libfranka](https://frankaemika.github.io/docs/installation_linux.html#building-from-source) on the machine that will run the controller
-2. Make sure the system is [setup properly to work with the robot](https://frankaemika.github.io/docs/getting_started.html#verifying-the-connection)
-3. Install [mc_rtc] on the machine that will run the controller
-4. Install [panda_cnoid] on the machine that will run the controller
-5. Compile and install this program (`cmake/make/sudo make install`)
+1. Make sure the system is [setup properly to work with the robot](https://frankaemika.github.io/docs/getting_started.html#verifying-the-connection)
+2. Install this project's dependencies
+3. Install this project (`cmake`/`make`/`make install`)
 
-Running
---
-
-After installing, make sure that you mc_rtc configuration file (`~/.config/mc_rtc/mc_rtc.yaml`) contains the following lines:
+After installing, make sure that your mc_rtc configuration file (typically `~/.config/mc_rtc/mc_rtc.yaml`) contains the following lines:
 
 ```yaml
-MainRobot: panda # Or panda_foot/panda_tool according to the end-effector installed on the robot
+# General mc_rtc configuration to run a panda controller at 1kHz
+MainRobot: PandaDefault # Or PandaHand/PandaFoot/PandaPump according to the end-effector installed on the robot
 Enabled: YourController
-Timestep: 0.001 # The controller must run at 1kHz
-LogPolicy: threaded # Avoid slowdowns due to disk flush
+Timestep: 0.001
+
+# Set a LogPolicy suitable for real-time
+LogPolicy: threaded
+
+# Franka specific configuration
+Franka:
+  ControlMode: Position # Can be: Position/Velocity/Torque
+  panda_default: # Name of the robot in the controller
+    ip: 172.16.0.2 # IP of the robot
+  panda_2: # Name of an extra panda in the controller
+    ip: 172.16.1.2
+  # Actuated robots that are not controlled via mc_franka
+  ignored: [env/door, env/box]
 ```
 
+Run the program:
 
 ```bash
-MCFrankaControl <fci-ip>
+MCFrankaControl
 ```
 
-Where `<fci-ip>` is the robot's IP
+You can also provide an additional configuration file (to swap between different network configurations easily for example):
+
+```bash
+MCFrankaControl -f conf.yaml
+```
+
+Note: `MCFrankaControl` uses a deadline scheduler policy (available in PREEMPT RT patched kernels) to schedule executions of [mc_rtc] control loop thus it requires root permission to run.
+
+[![I.AM.Logo](https://i-am-project.eu/templates/yootheme/cache/iam_logo-horizontaal_XL-9e4a8a2a.png)](https://i-am-project.eu/index.php)
+
+This work was partially supported by the Research Project I.AM. through the European Union H2020 program under GA 871899.
 
 [libfranka]: https://github.com/frankaemika/libfranka
-[mc_rtc]: http://github.com/jrl-umi3218/mc_rtc
-[panda_cnoid]: https://github.com/gergondet/panda_cnoid
+[mc_rtc]: https://github.com/jrl-umi3218/mc_rtc
+[mc_panda]: https://github.com/jrl-umi3218/mc_panda
