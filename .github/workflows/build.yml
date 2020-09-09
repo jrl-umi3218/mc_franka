@@ -1,0 +1,85 @@
+name: CI of mc_franka
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  schedule:
+    # Run on Sunday, Tuesday and Thursday nights
+    - cron: '0 23 * * 0,1,4'
+
+jobs:
+
+  clang-format:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install clang-format-6.0
+      run: |
+        sudo rm -f /etc/apt/sources.list.d/dotnetdev.list /etc/apt/sources.list.d/microsoft-prod.list
+        sudo apt-get -qq update
+        sudo apt-get -qq remove clang-6.0 libclang1-6.0 libclang-common-6.0-dev libllvm6.0
+        sudo apt-get -qq install clang-format-6.0 clang-format
+    - name: Run clang-format-check
+      run: |
+        ./.clang-format-check.sh
+  build:
+    needs: clang-format
+    strategy:
+      matrix:
+        os: [ubuntu-18.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Install ROS dependencies
+      run: |
+        set -x
+        set -e
+        export ROS_DISTRO="melodic"
+        sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+        wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
+        sudo apt-get update -qq
+        sudo apt-get install -qq ros-${ROS_DISTRO}-libfranka ros-${ROS_DISTRO}-franka-ros
+        . /opt/ros/${ROS_DISTRO}/setup.bash
+        echo "::set-env name=ROS_DISTRO::${ROS_DISTRO}"
+        echo "::set-env name=PKG_CONFIG_PATH::${PKG_CONFIG_PATH}"
+        echo "::set-env name=ROS_MASTER_URI::${ROS_MASTER_URI}"
+        echo "::set-env name=ROS_PACKAGE_PATH::${ROS_PACKAGE_PATH}"
+        echo "::set-env name=PYTHONPATH::${PYTHONPATH}"
+        echo "::set-env name=CMAKE_PREFIX_PATH::${CMAKE_PREFIX_PATH}"
+        echo "::set-env name=PATH::${PATH}"
+        echo "::set-env name=LD_LIBRARY_PATH::${LD_LIBRARY_PATH}"
+    - name: Install mc_rtc
+      run: |
+        set -x
+        set -e
+        sudo apt-get install -y apt-transport-https lsb-release ca-certificates gnupg
+        sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key 892EA6EE273707C6495A6FB6220D644C64666806
+        sudo sh -c 'echo "deb https://dl.bintray.com/gergondet/multi-contact-head $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/multi-contact.list'
+        sudo apt-get update
+        sudo apt-get install -y libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-${ROS_DISTRO}-mc-rtc-plugin mc-openrtm jvrc-choreonoid libcnoid-dev
+    - name: Install mc_panda
+      uses: jrl-umi3218/github-actions/install-dependencies@master
+      with:
+        compiler: gcc
+        build-type: RelWithDebInfo
+        github: |
+          - path: jrl-umi3218/mc_panda
+    - name: Build and test
+      uses: jrl-umi3218/github-actions/build-cmake-project@master
+      with:
+        compiler: gcc
+        build-type: RelWithDebInfo
+    - name: Slack Notification
+      if: failure()
+      uses: archive/github-actions-slack@master
+      with:
+        slack-bot-user-oauth-access-token: ${{ secrets.SLACK_BOT_TOKEN }}
+        slack-channel: '#ci'
+        slack-text: >
+          [mc_franka] Build *${{ matrix.os }}/${{ matrix.build-type }}* failed on ${{ github.ref }}
