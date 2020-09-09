@@ -46,8 +46,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   // Initialize all real robots
   for(size_t i = controller.realRobots().size(); i < robots.size(); ++i)
   {
-    controller.realRobots().robotCopy(robots.robot(i));
-    controller.realRobots().robots().back().name(robots.robot(i).name());
+    controller.realRobots().robotCopy(robots.robot(i), robots.robot(i).name());
   }
   // Initialize controlled panda robot
   loop_data->pandas = new std::vector<PandaControlLoopPtr<cm>>();
