@@ -27,4 +27,7 @@ endmacro()
 add_panda_util(PrintPandaState)
 add_panda_util(StopPandaPump)
 
-install(TARGETS MCFrankaControl DESTINATION bin)
+install(
+  TARGETS MCFrankaControl
+  DESTINATION bin
+  PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID)
