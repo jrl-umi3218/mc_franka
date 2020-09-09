@@ -55,7 +55,7 @@ You can also provide an additional configuration file (to swap between different
 MCFrankaControl -f conf.yaml
 ```
 
-Note: `MCFrankaControl` uses a deadline scheduler policy (available in PREEMPT RT patched kernels) to schedule executions of [mc_rtc] control loop thus it requires root permission to run.
+Note: `MCFrankaControl` uses a deadline scheduler policy (available in PREEMPT RT patched kernels) to schedule executions of [mc_rtc] control loop thus it requires root permission to run. However, those are released as soon as the scheduler policy is setup and before any controller code is running.
 
 [![I.AM.Logo](https://i-am-project.eu/templates/yootheme/cache/iam_logo-horizontaal_XL-9e4a8a2a.png)](https://i-am-project.eu/index.php)
 

@@ -61,6 +61,13 @@ int main(int argc, char * argv[])
     return -2;
   }
 
+  /* De-escalate privileges */
+  if(setuid(getuid()))
+  {
+    printf("setuid failed: %m\n");
+    return -2;
+  }
+
   /* Run */
   mc_franka::run(data);
 
