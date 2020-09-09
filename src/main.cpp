@@ -1,5 +1,6 @@
 /* Copyright 2020 mc_rtc development team */
 
+#include <errno.h>
 #include <linux/sched.h>
 #include <linux/sched/types.h>
 #include <stdint.h>
@@ -26,6 +27,13 @@ int main(int argc, char * argv[])
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1)
   {
     printf("mlockall failed: %m\n");
+    if(errno == ENOMEM)
+    {
+      printf("\nIt is likely your user does not have enough memory limits, you can change the limits by adding the "
+             "following line to /etc/security/limits.conf:\n\n");
+      printf("%s - memlock 1000000000\n\n", getlogin());
+      printf("Then log-in and log-out\n");
+    }
     return -2;
   }
 
@@ -58,13 +66,6 @@ int main(int argc, char * argv[])
   if(sched_setattr(0, &attr, 0) < 0)
   {
     printf("sched_setattr failed: %m\n");
-    return -2;
-  }
-
-  /* De-escalate privileges */
-  if(setuid(getuid()))
-  {
-    printf("setuid failed: %m\n");
     return -2;
   }
 

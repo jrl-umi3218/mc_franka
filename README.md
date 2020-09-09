@@ -20,8 +20,21 @@ Usage
 1. Make sure the system is [setup properly to work with the robot](https://frankaemika.github.io/docs/getting_started.html#verifying-the-connection)
 2. Install this project's dependencies
 3. Install this project (`cmake`/`make`/`make install`)
+4. Make sure your user account has sufficient memory limits
 
-After installing, make sure that your mc_rtc configuration file (typically `~/.config/mc_rtc/mc_rtc.yaml`) contains the following lines:
+For that last point, you want to edit `/etc/security/limits.conf` and add the following line:
+
+```
+USERNAME - memlock 1000000000
+```
+
+Then log-out and log-in, you can confirm the new limit is active by running:
+
+```bash
+ulimit -l
+```
+
+Your mc_rtc configuration file (typically `~/.config/mc_rtc/mc_rtc.yaml`) should contain the following lines:
 
 ```yaml
 # General mc_rtc configuration to run a panda controller at 1kHz
@@ -54,8 +67,6 @@ You can also provide an additional configuration file (to swap between different
 ```bash
 MCFrankaControl -f conf.yaml
 ```
-
-Note: `MCFrankaControl` uses a deadline scheduler policy (available in PREEMPT RT patched kernels) to schedule executions of [mc_rtc] control loop thus it requires root permission to run. However, those are released as soon as the scheduler policy is setup and before any controller code is running.
 
 [![I.AM.Logo](https://i-am-project.eu/templates/yootheme/cache/iam_logo-horizontaal_XL-9e4a8a2a.png)](https://i-am-project.eu/index.php)
 
