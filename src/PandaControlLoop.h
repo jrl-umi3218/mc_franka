@@ -5,8 +5,8 @@
 #include "PandaControlType.h"
 #include "defs.h"
 
-#include <mc_panda/devices/Robot.h>
 #include <mc_panda/devices/Pump.h>
+#include <mc_panda/devices/Robot.h>
 
 #include <mc_control/mc_global_controller.h>
 

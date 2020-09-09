@@ -1,13 +1,13 @@
 #!/bin/bash
 
-readonly project_dir=`cd $(dirname $0)/../..; pwd`
-cd $project_dir
+readonly mc_rtc_dir=`cd $(dirname $0)/../..; pwd`
+cd $mc_rtc_dir
 
 source .clang-format-common.sh
 
 out=0
 tmpfile=$(mktemp /tmp/clang-format-check.XXXXXX)
-for f in `git diff --cached --name-only --diff-filter=ACM`; do
+for f in `git diff --cached --name-only --diff-filter=ACM|grep -v "^doc"`; do
   case "$f" in
     *.cpp | *.h | *.hpp)
       $clang_format -style=file $f > $tmpfile
