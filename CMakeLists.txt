@@ -2,6 +2,20 @@ cmake_minimum_required(VERSION 3.1)
 
 project(mc_franka LANGUAGES CXX VERSION 1.0.0)
 
+find_program(SUDO sudo)
+if(NOT SUDO)
+  message(FATAL_ERROR "sudo must be available on the system")
+else()
+  message("-- sudo command: ${SUDO}")
+endif()
+
+find_program(SETCAP setcap)
+if(NOT SETCAP)
+  message(FATAL_ERROR "setcap must be available on the system")
+else()
+  message("-- setcap command: ${SETCAP}")
+endif()
+
 find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(mc_panda REQUIRED) # brings Franka and mc_rtc
 
@@ -17,6 +31,11 @@ set(MCFrankaControl_SRC
 
 add_executable(MCFrankaControl ${MCFrankaControl_SRC})
 target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka Boost::program_options mc_panda::devices)
+# CAP_SYS_NICE is required to set the SCHED_DEADLINE policy, we set it on the generated executable and the installed one
+add_custom_target(setcap_MCFrankaControl ALL COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip $<TARGET_FILE:MCFrankaControl> DEPENDS MCFrankaControl)
+
+install(TARGETS MCFrankaControl DESTINATION bin)
+install(CODE "execute_process(COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip ${CMAKE_INSTALL_PREFIX}/bin/MCFrankaControl)")
 
 macro(add_panda_util NAME)
   add_executable(${NAME} src/${NAME}.cpp)
@@ -26,5 +45,3 @@ endmacro()
 
 add_panda_util(PrintPandaState)
 add_panda_util(StopPandaPump)
-
-install(TARGETS MCFrankaControl DESTINATION bin)
