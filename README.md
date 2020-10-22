@@ -68,6 +68,15 @@ You can also provide an additional configuration file (to swap between different
 MCFrankaControl -f conf.yaml
 ```
 
+Known issues
+--
+
+`MCFrankaControl` will not pick up on newly installed libraries. To work-around this issue, run the following command after installing a new module:
+
+```bash
+sudo ldconfig
+```
+
 [![I.AM.Logo](https://i-am-project.eu/templates/yootheme/cache/iam_logo-horizontaal_XL-9e4a8a2a.png)](https://i-am-project.eu/index.php)
 
 This work was partially supported by the Research Project I.AM. through the European Union H2020 program under GA 871899.
