@@ -44,6 +44,7 @@ jobs:
         sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
         wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
         sudo apt-get update -qq
+        sudo apt-get -qq remove libomp5-9 || true
         sudo apt-get install -qq ros-${ROS_DISTRO}-libfranka ros-${ROS_DISTRO}-franka-ros
         . /opt/ros/${ROS_DISTRO}/setup.bash
         echo "ROS_DISTRO=${ROS_DISTRO}" >> $GITHUB_ENV
@@ -61,8 +62,8 @@ jobs:
         sudo apt-get install -y apt-transport-https lsb-release ca-certificates gnupg
         sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key 892EA6EE273707C6495A6FB6220D644C64666806
         sudo sh -c 'echo "deb https://dl.bintray.com/gergondet/multi-contact-head $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/multi-contact.list'
-        sudo apt-get update
-        sudo apt-get install -y libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-${ROS_DISTRO}-mc-rtc-plugin mc-openrtm jvrc-choreonoid libcnoid-dev
+        sudo apt-get update -qq
+        sudo apt-get install -qq libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-${ROS_DISTRO}-mc-rtc-plugin mc-openrtm jvrc-choreonoid libcnoid-dev
     - name: Install mc_panda
       uses: jrl-umi3218/github-actions/install-dependencies@master
       with:
