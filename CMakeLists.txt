@@ -36,6 +36,7 @@ add_custom_target(setcap_MCFrankaControl ALL COMMAND ${SUDO} -S ${SETCAP} cap_sy
 
 install(TARGETS MCFrankaControl DESTINATION bin)
 install(CODE "execute_process(COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip ${CMAKE_INSTALL_PREFIX}/bin/MCFrankaControl)")
+install(CODE "execute_process(COMMAND ${SUDO} -S chown $ENV{USER} ${CMAKE_INSTALL_PREFIX}/bin/MCFrankaControl)")
 
 macro(add_panda_util NAME)
   add_executable(${NAME} src/${NAME}.cpp)
