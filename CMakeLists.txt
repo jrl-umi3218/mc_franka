@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.1)
 
 project(mc_franka LANGUAGES CXX VERSION 1.0.0)
 
+set(CMAKE_INSTALL_RPATH "$ENV{LD_LIBRARY_PATH}")
+
 find_program(SUDO sudo)
 if(NOT SUDO)
   message(FATAL_ERROR "sudo must be available on the system")
@@ -36,7 +38,6 @@ add_custom_target(setcap_MCFrankaControl ALL COMMAND ${SUDO} -S ${SETCAP} cap_sy
 
 install(TARGETS MCFrankaControl DESTINATION bin)
 install(CODE "execute_process(COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip ${CMAKE_INSTALL_PREFIX}/bin/MCFrankaControl)")
-install(CODE "execute_process(COMMAND ${SUDO} -S chown $ENV{USER} ${CMAKE_INSTALL_PREFIX}/bin/MCFrankaControl)")
 
 macro(add_panda_util NAME)
   add_executable(${NAME} src/${NAME}.cpp)
