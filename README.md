@@ -77,6 +77,28 @@ Known issues
 sudo ldconfig
 ```
 
+### Video presentation
+
+A video demonstrating panda motion generation and simultaneous pump actuation employing this implementation is available here:
+
+[![Video presentation](https://img.youtube.com/vi/juynq6x9JJ8/0.jpg)](https://youtu.be/juynq6x9JJ8 "Safe Impacts with Soft Contacts Based on Learned Deformations")
+
+### Reference
+
+Writing code takes time.
+If this implementation is useful for your research, please cite the related publication:
+
+```
+@unpublished{dehio2020arxiv,
+  title = {Safe Impacts with Soft Contacts Based on Learned Deformations},
+  author = {Dehio, Niels and Kheddar, Abderrahmane},
+  pdf = {https://hal.archives-ouvertes.fr/hal-02973947/document},
+  url = {https://hal.archives-ouvertes.fr/hal-02973947},
+  month = {October},
+  year = {2020}
+}
+```
+
 [![I.AM.Logo](https://i-am-project.eu/templates/yootheme/cache/iam_logo-horizontaal_XL-9e4a8a2a.png)](https://i-am-project.eu/index.php)
 
 This work was partially supported by the Research Project I.AM. through the European Union H2020 program under GA 871899.
