@@ -23,7 +23,7 @@ namespace mc_franka
  *
  * 2. Use mc_rtc output to send relevant control information to the panda
  */
-template<ControlMode cm>
+template<ControlMode cm, bool ShowNetworkWarnings>
 struct PandaControlLoop
 {
   /** Constructor
@@ -95,15 +95,15 @@ private:
   void updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robot & real);
 };
 
-template<ControlMode cm>
-using PandaControlLoopPtr = std::unique_ptr<PandaControlLoop<cm>>;
+template<ControlMode cm, bool ShowNetworkWarnings>
+using PandaControlLoopPtr = std::unique_ptr<PandaControlLoop<cm, ShowNetworkWarnings>>;
 
-template<ControlMode cm>
-PandaControlLoop<cm>::PandaControlLoop(const std::string & name,
-                                       const std::string & ip,
-                                       size_t steps,
-                                       mc_panda::Robot & device,
-                                       mc_panda::Pump * pump)
+template<ControlMode cm, bool ShowNetworkWarnings>
+PandaControlLoop<cm, ShowNetworkWarnings>::PandaControlLoop(const std::string & name,
+                                                            const std::string & ip,
+                                                            size_t steps,
+                                                            mc_panda::Robot & device,
+                                                            mc_panda::Pump * pump)
 : name_(name), robot_(ip), state_(robot_.readOnce()), control_(state_), device_(device), steps_(steps),
   logger_(mc_rtc::Logger::Policy::THREADED, "/tmp", "mc-franka-" + name_)
 {
@@ -120,8 +120,8 @@ PandaControlLoop<cm>::PandaControlLoop(const std::string & name,
   device.addToLogger(logger_, name);
 }
 
-template<ControlMode cm>
-void PandaControlLoop<cm>::init(mc_control::MCGlobalController & controller)
+template<ControlMode cm, bool ShowNetworkWarnings>
+void PandaControlLoop<cm, ShowNetworkWarnings>::init(mc_control::MCGlobalController & controller)
 {
   logger_.start(controller.current_controller(), 0.001);
   logger_.addLogEntry("sensors_id", [this]() { return sensor_id_; });
@@ -144,8 +144,8 @@ void PandaControlLoop<cm>::init(mc_control::MCGlobalController & controller)
   real.mbc() = robot.mbc();
 }
 
-template<ControlMode cm>
-void PandaControlLoop<cm>::updateSensors(mc_control::MCGlobalController & controller)
+template<ControlMode cm, bool ShowNetworkWarnings>
+void PandaControlLoop<cm, ShowNetworkWarnings>::updateSensors(mc_control::MCGlobalController & controller)
 {
   std::unique_lock<std::mutex> lock(updateSensorsMutex_);
   auto & robot = controller.controller().robots().robot(name_);
@@ -153,8 +153,8 @@ void PandaControlLoop<cm>::updateSensors(mc_control::MCGlobalController & contro
   updateSensors(robot, real);
 }
 
-template<ControlMode cm>
-void PandaControlLoop<cm>::updateControl(mc_control::MCGlobalController & controller)
+template<ControlMode cm, bool ShowNetworkWarnings>
+void PandaControlLoop<cm, ShowNetworkWarnings>::updateControl(mc_control::MCGlobalController & controller)
 {
   std::unique_lock<std::mutex> lock(updateControlMutex_);
   auto & robot = controller.controller().robots().robot(name_);
@@ -162,12 +162,12 @@ void PandaControlLoop<cm>::updateControl(mc_control::MCGlobalController & contro
   control_id_++;
 }
 
-template<ControlMode cm>
-void PandaControlLoop<cm>::controlThread(mc_control::MCGlobalController & controller,
-                                         std::mutex & startM,
-                                         std::condition_variable & startCV,
-                                         bool & start,
-                                         bool & running)
+template<ControlMode cm, bool ShowNetworkWarnings>
+void PandaControlLoop<cm, ShowNetworkWarnings>::controlThread(mc_control::MCGlobalController & controller,
+                                                              std::mutex & startM,
+                                                              std::condition_variable & startCV,
+                                                              bool & start,
+                                                              bool & running)
 {
   {
     std::unique_lock<std::mutex> lock(startM);
@@ -186,7 +186,7 @@ void PandaControlLoop<cm>::controlThread(mc_control::MCGlobalController & contro
         sensor_id_ += dt.toMSec();
         if(sensor_id_ % steps_ == 0)
         {
-          if(control_id_ != prev_control_id_ + dt.toMSec())
+          if(ShowNetworkWarnings && control_id_ != prev_control_id_ + dt.toMSec())
           {
             mc_rtc::log::warning("[mc_franka] {} missed control data (previous: {}, current: {}, expected: {}", name_,
                                  prev_control_id_, control_id_, prev_control_id_ + dt.toMSec());
@@ -203,8 +203,8 @@ void PandaControlLoop<cm>::controlThread(mc_control::MCGlobalController & contro
       });
 }
 
-template<ControlMode cm>
-void PandaControlLoop<cm>::updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robot & real)
+template<ControlMode cm, bool ShowNetworkWarnings>
+void PandaControlLoop<cm, ShowNetworkWarnings>::updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robot & real)
 {
   using get_sensor_t = const std::vector<double> & (mc_rbdyn::Robot::*)() const;
   using set_sensor_t = void (mc_rbdyn::Robot::*)(const std::vector<double> &);

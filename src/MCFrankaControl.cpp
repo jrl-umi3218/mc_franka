@@ -13,25 +13,29 @@ namespace mc_franka
 
 struct ControlLoopDataBase
 {
-  ControlLoopDataBase(ControlMode cm) : mode(cm), controller(nullptr), panda_threads(nullptr) {}
+  ControlLoopDataBase(ControlMode cm, bool show_network_warnings)
+  : mode(cm), show_network_warnings(show_network_warnings), controller(nullptr), panda_threads(nullptr)
+  {
+  }
   ControlMode mode;
+  bool show_network_warnings = false;
   mc_control::MCGlobalController * controller;
   std::vector<std::thread> * panda_threads;
 };
 
-template<ControlMode cm>
+template<ControlMode cm, bool ShowNetworkWarnings>
 struct ControlLoopData : public ControlLoopDataBase
 {
-  ControlLoopData() : ControlLoopDataBase(cm), pandas(nullptr) {}
-  std::vector<PandaControlLoopPtr<cm>> * pandas;
+  ControlLoopData() : ControlLoopDataBase(cm, ShowNetworkWarnings), pandas(nullptr) {}
+  std::vector<PandaControlLoopPtr<cm, ShowNetworkWarnings>> * pandas;
 };
 
-template<ControlMode cm>
+template<ControlMode cm, bool ShowNetworkWarnings>
 void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & gconfig)
 {
   auto frankaConfig = gconfig.config("Franka");
   auto ignoredRobots = frankaConfig("ignored", std::vector<std::string>{});
-  auto loop_data = new ControlLoopData<cm>();
+  auto loop_data = new ControlLoopData<cm, ShowNetworkWarnings>();
   loop_data->controller = new mc_control::MCGlobalController(gconfig);
   loop_data->panda_threads = new std::vector<std::thread>();
   auto & controller = *loop_data->controller;
@@ -49,7 +53,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
     controller.realRobots().robotCopy(robots.robot(i), robots.robot(i).name());
   }
   // Initialize controlled panda robot
-  loop_data->pandas = new std::vector<PandaControlLoopPtr<cm>>();
+  loop_data->pandas = new std::vector<PandaControlLoopPtr<cm, ShowNetworkWarnings>>();
   auto & pandas = *loop_data->pandas;
   {
     std::vector<std::thread> panda_init_threads;
@@ -76,8 +80,8 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
           }
           auto pump = mc_panda::Pump::get(robot);
           auto & device = *mc_panda::Robot::get(robot);
-          auto panda =
-              std::unique_ptr<PandaControlLoop<cm>>(new PandaControlLoop<cm>(robot.name(), ip, n_steps, device, pump));
+          auto panda = std::unique_ptr<PandaControlLoop<cm, ShowNetworkWarnings>>(
+              new PandaControlLoop<cm, ShowNetworkWarnings>(robot.name(), ip, n_steps, device, pump));
           device.addToLogger(controller.controller().logger(), robot.name());
           if(pump)
           {
@@ -123,9 +127,19 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
 }
 
 template<ControlMode cm>
+void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & gconfig, bool ShowNetworkWarnings)
+{
+  if(ShowNetworkWarnings)
+  {
+    return global_thread_init<cm, true>(gconfig);
+  }
+  return global_thread_init<cm, false>(gconfig);
+}
+
+template<ControlMode cm, bool ShowNetworkWarnings>
 void run_impl(void * data)
 {
-  auto control_data = static_cast<ControlLoopData<cm> *>(data);
+  auto control_data = static_cast<ControlLoopData<cm, ShowNetworkWarnings> *>(data);
   auto controller_ptr = control_data->controller;
   auto & controller = *controller_ptr;
   auto & pandas = *control_data->pandas;
@@ -164,17 +178,33 @@ void run_impl(void * data)
   delete controller_ptr;
 }
 
+template<ControlMode cm>
+void run_impl(void * data, bool ShowNetworkWarnings)
+{
+  if(ShowNetworkWarnings)
+  {
+    run_impl<cm, true>(data);
+  }
+  else
+  {
+    run_impl<cm, false>(data);
+  }
+}
+
 void run(void * data)
 {
   auto control_data = static_cast<ControlLoopDataBase *>(data);
   switch(control_data->mode)
   {
     case ControlMode::Position:
-      return run_impl<ControlMode::Position>(data);
+      run_impl<ControlMode::Position>(data, control_data->show_network_warnings);
+      break;
     case ControlMode::Velocity:
-      return run_impl<ControlMode::Velocity>(data);
+      run_impl<ControlMode::Velocity>(data, control_data->show_network_warnings);
+      break;
     case ControlMode::Torque:
-      return run_impl<ControlMode::Torque>(data);
+      run_impl<ControlMode::Torque>(data, control_data->show_network_warnings);
+      break;
   }
 }
 
@@ -207,16 +237,17 @@ void * init(int argc, char * argv[], uint64_t & cycle_ns)
   }
   auto frankaConfig = gconfig.config("Franka");
   ControlMode cm = frankaConfig("ControlMode", ControlMode::Velocity);
+  bool ShowNetworkWarnings = frankaConfig("ShowNetworkWarnings", true);
   try
   {
     switch(cm)
     {
       case ControlMode::Position:
-        return global_thread_init<ControlMode::Position>(gconfig);
+        return global_thread_init<ControlMode::Position>(gconfig, ShowNetworkWarnings);
       case ControlMode::Velocity:
-        return global_thread_init<ControlMode::Velocity>(gconfig);
+        return global_thread_init<ControlMode::Velocity>(gconfig, ShowNetworkWarnings);
       case ControlMode::Torque:
-        return global_thread_init<ControlMode::Torque>(gconfig);
+        return global_thread_init<ControlMode::Torque>(gconfig, ShowNetworkWarnings);
     }
   }
   catch(const franka::Exception & e)
