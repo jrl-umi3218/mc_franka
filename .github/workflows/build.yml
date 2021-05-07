@@ -30,7 +30,7 @@ jobs:
     needs: clang-format
     strategy:
       matrix:
-        os: [ubuntu-18.04]
+        os: [ubuntu-18.04, ubuntu-20.04]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -40,7 +40,12 @@ jobs:
       run: |
         set -x
         set -e
-        export ROS_DISTRO="melodic"
+        if [ "${{ matrix.os }}" = "ubuntu-18.04" ]
+        then
+          export ROS_DISTRO="melodic"
+        else
+          export ROS_DISTRO="noetic"
+        fi
         sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
         wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
         sudo apt-get update -qq
@@ -59,10 +64,7 @@ jobs:
       run: |
         set -x
         set -e
-        sudo apt-get install -y apt-transport-https lsb-release ca-certificates gnupg
-        sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key 892EA6EE273707C6495A6FB6220D644C64666806
-        sudo sh -c 'echo "deb https://dl.bintray.com/gergondet/multi-contact-head $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/multi-contact.list'
-        sudo apt-get update -qq
+        curl -1sLf 'https://dl.cloudsmith.io/public/mc-rtc/head/setup.deb.sh' | sudo -E bash
         sudo apt-get install -qq libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-${ROS_DISTRO}-mc-rtc-plugin mc-openrtm jvrc-choreonoid libcnoid-dev
     - name: Install mc_panda
       uses: jrl-umi3218/github-actions/install-dependencies@master
