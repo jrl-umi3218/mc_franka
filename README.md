@@ -89,13 +89,14 @@ Writing code takes time.
 If this implementation is useful for your research, please cite the related publication:
 
 ```
-@unpublished{dehio2020arxiv,
-  title = {Safe Impacts with Soft Contacts Based on Learned Deformations},
-  author = {Dehio, Niels and Kheddar, Abderrahmane},
+@INPROCEEDINGS{Dehio2021ICRA,
+  title={Robot-Safe Impacts with Soft Contacts Based on Learned Deformations}, 
+  author={Dehio, Niels and Kheddar, Abderrahmane},
+  booktitle={IEEE Int. Conf. on Robotics and Automation},
+  pages={1357-1363},
+  year={2021},
   pdf = {https://hal.archives-ouvertes.fr/hal-02973947/document},
-  url = {https://hal.archives-ouvertes.fr/hal-02973947},
-  month = {October},
-  year = {2020}
+  url = {https://hal.archives-ouvertes.fr/hal-02973947}
 }
 ```
 
