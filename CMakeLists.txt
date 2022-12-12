@@ -34,7 +34,11 @@ set(MCFrankaControl_SRC
 add_executable(MCFrankaControl ${MCFrankaControl_SRC})
 target_link_libraries(MCFrankaControl PUBLIC mc_rtc::mc_control Franka::Franka Boost::program_options mc_panda::devices)
 # CAP_SYS_NICE is required to set the SCHED_DEADLINE policy, we set it on the generated executable and the installed one
-add_custom_target(setcap_MCFrankaControl ALL COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip $<TARGET_FILE:MCFrankaControl> DEPENDS MCFrankaControl)
+set(JOB_POOL_OPTION)
+if(${CMAKE_VERSION} VERSION_GREATER "3.14")
+  set(JOB_POOL_OPTION JOB_POOL console)
+endif()
+add_custom_target(setcap_MCFrankaControl ALL COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip $<TARGET_FILE:MCFrankaControl> DEPENDS MCFrankaControl ${JOB_POOL_OPTION})
 
 install(TARGETS MCFrankaControl DESTINATION bin)
 install(CODE "execute_process(COMMAND ${SUDO} -S ${SETCAP} cap_sys_nice+eip ${CMAKE_INSTALL_PREFIX}/bin/MCFrankaControl)")
