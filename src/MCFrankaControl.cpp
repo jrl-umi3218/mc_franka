@@ -248,6 +248,8 @@ void * init(int argc, char * argv[], uint64_t & cycle_ns)
         return global_thread_init<ControlMode::Velocity>(gconfig, ShowNetworkWarnings);
       case ControlMode::Torque:
         return global_thread_init<ControlMode::Torque>(gconfig, ShowNetworkWarnings);
+      default:
+        return nullptr;
     }
   }
   catch(const franka::Exception & e)

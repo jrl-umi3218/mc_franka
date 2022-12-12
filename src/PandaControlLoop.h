@@ -11,6 +11,7 @@
 #include <mc_control/mc_global_controller.h>
 
 #include <condition_variable>
+#include <cstring>
 #include <thread>
 
 namespace mc_franka
@@ -91,8 +92,7 @@ private:
   mutable std::mutex updateSensorsMutex_;
   mutable std::mutex updateControlMutex_;
 
-  /** Actual update for the sensors */
-  void updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robot & real);
+  std::vector<double> sensorsBuffer_ = std::vector<double>(7, 0.0);
 };
 
 template<ControlMode cm, bool ShowNetworkWarnings>
@@ -149,8 +149,25 @@ void PandaControlLoop<cm, ShowNetworkWarnings>::updateSensors(mc_control::MCGlob
 {
   std::unique_lock<std::mutex> lock(updateSensorsMutex_);
   auto & robot = controller.controller().robots().robot(name_);
-  auto & real = controller.controller().realRobots().robot(name_);
-  updateSensors(robot, real);
+  using GC = mc_control::MCGlobalController;
+  using set_sensor_t = void (GC::*)(const std::string &, const std::vector<double> &);
+  auto updateSensor = [&controller, &robot, this](set_sensor_t set_sensor, const std::array<double, 7> & data) {
+    assert(sensorsBuffer_.size() == 7);
+    std::memcpy(sensorsBuffer_.data(), data.data(), 7 * sizeof(double));
+    (controller.*set_sensor)(robot.name(), sensorsBuffer_);
+  };
+  updateSensor(&GC::setEncoderValues, state_.q);
+  updateSensor(&GC::setEncoderVelocities, state_.dq);
+  updateSensor(&GC::setJointTorques, state_.tau_J);
+  auto wrench = sva::ForceVecd::Zero();
+  wrench.force().x() = state_.K_F_ext_hat_K[0];
+  wrench.force().y() = state_.K_F_ext_hat_K[1];
+  wrench.force().z() = state_.K_F_ext_hat_K[2];
+  wrench.couple().x() = state_.K_F_ext_hat_K[3];
+  wrench.couple().y() = state_.K_F_ext_hat_K[4];
+  wrench.couple().z() = state_.K_F_ext_hat_K[5];
+  robot.data()->forceSensors[robot.data()->forceSensorsIndex.at("LeftHandForceSensor")].wrench(wrench);
+  device_.state(state_);
 }
 
 template<ControlMode cm, bool ShowNetworkWarnings>
@@ -176,7 +193,7 @@ void PandaControlLoop<cm, ShowNetworkWarnings>::controlThread(mc_control::MCGlob
   auto start_t = clock::now();
   control_.control(
       robot_,
-      [&, this ](const franka::RobotState & stateIn, franka::Duration dt) -> typename PandaControlType<cm>::ReturnT {
+      [&, this](const franka::RobotState & stateIn, franka::Duration dt) -> typename PandaControlType<cm>::ReturnT {
         std::unique_lock<std::mutex> ctlLock(updateControlMutex_);
         std::unique_lock<std::mutex> senLock(updateSensorsMutex_);
         auto now = clock::now();
@@ -201,39 +218,6 @@ void PandaControlLoop<cm, ShowNetworkWarnings>::controlThread(mc_control::MCGlob
         }
         return franka::MotionFinished(control_);
       });
-}
-
-template<ControlMode cm, bool ShowNetworkWarnings>
-void PandaControlLoop<cm, ShowNetworkWarnings>::updateSensors(mc_rbdyn::Robot & robot, mc_rbdyn::Robot & real)
-{
-  using get_sensor_t = const std::vector<double> & (mc_rbdyn::Robot::*)() const;
-  using set_sensor_t = void (mc_rbdyn::Robot::*)(const std::vector<double> &);
-  auto updateSensor = [&](get_sensor_t get, set_sensor_t set, const std::array<double, 7> & value) {
-    auto sensor = (robot.*get)();
-    if(sensor.size() != robot.refJointOrder().size())
-    {
-      sensor.resize(robot.refJointOrder().size());
-    }
-    for(size_t i = 0; i < value.size(); ++i)
-    {
-      sensor[i] = value[i];
-    }
-    (robot.*set)(sensor);
-    (real.*set)(sensor);
-  };
-  updateSensor(&mc_rbdyn::Robot::encoderValues, &mc_rbdyn::Robot::encoderValues, state_.q);
-  updateSensor(&mc_rbdyn::Robot::encoderVelocities, &mc_rbdyn::Robot::encoderVelocities, state_.dq);
-  updateSensor(&mc_rbdyn::Robot::jointTorques, &mc_rbdyn::Robot::jointTorques, state_.tau_J);
-  auto wrench = sva::ForceVecd::Zero();
-  wrench.force().x() = state_.K_F_ext_hat_K[0];
-  wrench.force().y() = state_.K_F_ext_hat_K[1];
-  wrench.force().z() = state_.K_F_ext_hat_K[2];
-  wrench.couple().x() = state_.K_F_ext_hat_K[3];
-  wrench.couple().y() = state_.K_F_ext_hat_K[4];
-  wrench.couple().z() = state_.K_F_ext_hat_K[5];
-  robot.forceSensor("LeftHandForceSensor").wrench(wrench);
-  real.forceSensor("LeftHandForceSensor").wrench(wrench);
-  device_.state(state_);
 }
 
 } // namespace mc_franka
