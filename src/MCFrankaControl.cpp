@@ -20,6 +20,8 @@ struct ControlLoopDataBase
   ControlMode mode;
   bool show_network_warnings = false;
   mc_control::MCGlobalController * controller;
+  std::thread * controller_run;
+  std::condition_variable controller_run_cv;
   std::vector<std::thread> * panda_threads;
 };
 
@@ -123,6 +125,54 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   }
   startControl = true;
   startCV.notify_all();
+  loop_data->controller_run = new std::thread([loop_data]() {
+    auto controller_ptr = loop_data->controller;
+    auto & controller = *controller_ptr;
+    auto & pandas = *loop_data->pandas;
+    std::mutex controller_run_mtx;
+    timespec tv;
+    clock_gettime(CLOCK_REALTIME, &tv);
+    // Current time in milliseconds
+    double current_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6;
+    // Will record the time that passed between two runs
+    double elapsed_t = 0;
+    controller.controller().logger().addLogEntry("mc_franka_delay", [&elapsed_t]() { return elapsed_t; });
+    while(controller.running)
+    {
+      std::unique_lock lck(controller_run_mtx);
+      loop_data->controller_run_cv.wait(lck);
+      clock_gettime(CLOCK_REALTIME, &tv);
+      elapsed_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6 - current_t;
+      current_t = elapsed_t + current_t;
+      // Update from panda sensors
+      for(auto & panda : pandas)
+      {
+        panda->updateSensors(controller);
+      }
+      // Run the controller
+      controller.run();
+      // Update panda commands
+      for(auto & panda : pandas)
+      {
+        panda->updateControl(controller);
+      }
+    }
+  });
+#ifndef WIN32
+  // Lower thread priority so that it has a lesser priority than the real time
+  // thread
+  auto th_handle = loop_data->controller_run->native_handle();
+  int policy = 0;
+  sched_param param{};
+  pthread_getschedparam(th_handle, &policy, &param);
+  param.sched_priority = 99;
+  if(pthread_setschedparam(th_handle, SCHED_RR, &param) != 0)
+  {
+    mc_rtc::log::warning(
+        "[MCFrankaControl] Failed to lower calibration thread priority. If you are running on a real-time system, "
+        "this might cause latency to the real-time loop.");
+  }
+#endif
   return loop_data;
 }
 
@@ -142,31 +192,9 @@ void run_impl(void * data)
   auto control_data = static_cast<ControlLoopData<cm, ShowNetworkWarnings> *>(data);
   auto controller_ptr = control_data->controller;
   auto & controller = *controller_ptr;
-  auto & pandas = *control_data->pandas;
-  timespec tv;
-  clock_gettime(CLOCK_REALTIME, &tv);
-  // Current time in milliseconds
-  double current_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6;
-  // Will record the time that passed between two runs
-  double elapsed_t = 0;
-  controller.controller().logger().addLogEntry("mc_franka_delay", [&elapsed_t]() { return elapsed_t; });
   while(controller.running)
   {
-    clock_gettime(CLOCK_REALTIME, &tv);
-    elapsed_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6 - current_t;
-    current_t = elapsed_t + current_t;
-    // Update from panda sensors
-    for(auto & panda : pandas)
-    {
-      panda->updateSensors(controller);
-    }
-    // Run the controller
-    controller.run();
-    // Update panda commands
-    for(auto & panda : pandas)
-    {
-      panda->updateControl(controller);
-    }
+    control_data->controller_run_cv.notify_one();
     // Sleep until the next cycle
     sched_yield();
   }
@@ -174,6 +202,7 @@ void run_impl(void * data)
   {
     th.join();
   }
+  control_data->controller_run->join();
   delete control_data->pandas;
   delete controller_ptr;
 }
