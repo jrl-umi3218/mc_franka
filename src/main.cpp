@@ -23,6 +23,7 @@ int main(int argc, char * argv[])
 {
   struct sched_attr attr;
 
+#ifdef USE_REALTIME
   /* Lock memory */
   if(mlockall(MCL_CURRENT | MCL_FUTURE) == -1)
   {
@@ -36,6 +37,7 @@ int main(int argc, char * argv[])
     }
     return -2;
   }
+#endif
 
   /* Configure deadline policy */
   memset(&attr, 0, sizeof(attr));
@@ -62,12 +64,14 @@ int main(int argc, char * argv[])
 
   printf("Running real-time thread at %fms per cycle\n", cycle_ns / 1e6);
 
+#ifdef USE_REALTIME
   /* Set scheduler policy */
   if(sched_setattr(0, &attr, 0) < 0)
   {
     printf("sched_setattr failed: %m\n");
     return -2;
   }
+#endif
 
   /* Run */
   mc_franka::run(data);

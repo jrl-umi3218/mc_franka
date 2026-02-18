@@ -159,6 +159,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
     }
   });
 #ifndef WIN32
+#ifdef USE_REALTIME
   // Lower thread priority so that it has a lesser priority than the real time
   // thread
   auto th_handle = loop_data->controller_run->native_handle();
@@ -172,6 +173,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
         "[MCFrankaControl] Failed to lower calibration thread priority. If you are running on a real-time system, "
         "this might cause latency to the real-time loop.");
   }
+#endif
 #endif
   return loop_data;
 }
