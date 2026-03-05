@@ -159,6 +159,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
     }
   });
 #ifndef WIN32
+#ifdef USE_REALTIME
   // Lower thread priority so that it has a lesser priority than the real time
   // thread
   auto th_handle = loop_data->controller_run->native_handle();
@@ -172,6 +173,7 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
         "[MCFrankaControl] Failed to lower calibration thread priority. If you are running on a real-time system, "
         "this might cause latency to the real-time loop.");
   }
+#endif
 #endif
   return loop_data;
 }
@@ -194,9 +196,23 @@ void run_impl(void * data)
   auto & controller = *controller_ptr;
   while(controller.running)
   {
+    auto cycle_start = clock::now();
     control_data->controller_run_cv.notify_one();
-    // Sleep until the next cycle
+#ifdef USE_REALTIME
+    // Sleep until the next cycle (using the kernel's thread scheduler to ensure better timing)
     sched_yield();
+#else
+    // Pause this thread for the remaining time to keep 1ms cycle
+    constexpr int cycle_us = 1000; // 1ms cycle
+    auto cycle_end = clock::now();
+    auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(cycle_end - cycle_start).count();
+    if(elapsed_us < cycle_us)
+    {
+      auto sleep_ms = static_cast<double>(cycle_us - elapsed_us) / 1000.0;
+      // mc_rtc::log::info("[mc_franka] Using non-realtime interface, yielding until the next iteration by sleeping for {:.4f} ms", sleep_ms);
+      std::this_thread::sleep_for(std::chrono::microseconds(cycle_us - elapsed_us));
+    }
+#endif
   }
   for(auto & th : *control_data->panda_threads)
   {
