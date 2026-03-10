@@ -12,7 +12,8 @@ enum class ControlMode
 {
   Position,
   Velocity,
-  Torque
+  Torque,
+  Observed
 };
 }
 
@@ -36,6 +37,9 @@ struct ConfigurationLoader<mc_franka::ControlMode>
       case mc_franka::ControlMode::Torque:
         c.add("cm", "Torque");
         break;
+      case mc_franka::ControlMode::Observed:
+        c.add("cm", "Observed");
+        break;
       default:
         log::error_and_throw<std::runtime_error>("ControlMode has unexpected value");
     }
@@ -56,6 +60,10 @@ struct ConfigurationLoader<mc_franka::ControlMode>
     if(cm == "Torque")
     {
       return mc_franka::ControlMode::Torque;
+    }
+    if(cm == "Observed")
+    {
+      return mc_franka::ControlMode::Observed;
     }
     log::error_and_throw<std::runtime_error>("ControlMode has unexpected value {}", cm);
   }

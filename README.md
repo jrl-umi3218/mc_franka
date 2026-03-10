@@ -47,13 +47,26 @@ LogPolicy: threaded
 
 # Franka specific configuration
 Franka:
-  ControlMode: Position # Can be: Position/Velocity/Torque
+  ControlMode: Position # Can be: Position/Velocity/Torque/Observed
   panda_default: # Name of the robot in the controller
     ip: 172.16.0.2 # IP of the robot
   panda_2: # Name of an extra panda in the controller
     ip: 172.16.1.2
   # Actuated robots that are not controlled via mc_franka
   ignored: [env/door, env/box]
+```
+
+**Observed mode**: When `ControlMode: Observed` is set, `MCFrankaControl` reads the robot state via
+`franka::Robot::readOnce()` without sending any commands. `controller.run()` still executes so that
+mc_rtc observers, logging and the GUI continue to work. An optional `ObservedPeriod` key (in
+seconds, default `0.005`) controls how frequently the robot state is polled:
+
+```yaml
+Franka:
+  ControlMode: Observed
+  ObservedPeriod: 0.005 # Poll robot state every 5 ms
+  panda_default:
+    ip: 172.16.0.2
 ```
 
 Run the program:
