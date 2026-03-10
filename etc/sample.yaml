@@ -1,6 +1,7 @@
 # Sample configuration for a multi-robot connection
 Franka:
-  ControlMode: Velocity # Can be: Position/Velocity/Torque
+  ControlMode: Velocity # Can be: Position/Velocity/Torque/Observed
+  # ObservedPeriod: 0.005 # (Observed mode only) Polling period in seconds (default: 0.005)
   panda_default: # Name of the robot in the controller
     ip: 172.16.0.2 # IP associated to this robot
   panda_2: # Name of the robot in the controller

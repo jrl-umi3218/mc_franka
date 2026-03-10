@@ -39,6 +39,7 @@ set(MCFrankaControl_SRC
   src/MCFrankaControl.cpp
   src/PandaControlLoop.h
   src/PandaControlType.h
+  src/PandaObserveLoop.h
   src/thread.h
 )
 
