@@ -71,19 +71,19 @@ MCFrankaControl -f conf.yaml
 Known issues
 --
 
-- `MCFrankaControl` will not pick up on newly installed libraries. To work-around this issue, run the following command after installing a new module:
+It may happen that some libraries are not found due to the high priviligies given for real-time scheduling. To overcome it, please consider running the following commands :
+
+```bash
+echo "$HOME/workspace/devel/catkin_data_ws/install/lib" | sudo tee -a /etc/ld.so.conf.d/mc_rtc_ros.conf
+echo "$HOME/workspace/install/lib" | sudo tee -a /etc/ld.so.conf.d/mc_rtc.conf
+echo "/opt/ros/${ROS_DISTRO}/lib" | sudo tee -a /etc/ld.so.conf.d/ros2.conf
+```
+
+Then run the following command :
 
 ```bash
 sudo ldconfig
 ```
-
-- `MCFrankaControl` will not pick up ROS libraries. If you're using `mc_rtc`'s ROS plugin, create a file `/etc/ld.so.conf.d/ros.conf` with content:
-
-```
-/opt/ros/noetic/lib
-```
-
-It seems that this change will only be picked up after reboot.
 
 ### Video presentation
 
