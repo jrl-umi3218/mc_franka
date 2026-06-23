@@ -2,17 +2,16 @@
 
 #pragma once
 
-#include "PandaControlType.h"
-#include "defs.h"
-
+#include <mc_control/mc_global_controller.h>
 #include <mc_panda/devices/Pump.h>
 #include <mc_panda/devices/Robot.h>
-
-#include <mc_control/mc_global_controller.h>
 
 #include <condition_variable>
 #include <cstring>
 #include <thread>
+
+#include "PandaControlType.h"
+#include "defs.h"
 
 namespace mc_franka
 {
@@ -111,7 +110,9 @@ PandaControlLoop<cm, ShowNetworkWarnings>::PandaControlLoop(const std::string & 
   static auto panda_init_t = clock::now();
   auto now = clock::now();
   duration_us dt = now - panda_init_t;
-  mc_rtc::log::info("[mc_franka] Elapsed time since the creation of another PandaControlLoop: {}us", dt.count());
+  mc_rtc::log::info("[mc_franka] Elapsed time since the creation of another "
+                    "PandaControlLoop: {}us",
+                    dt.count());
   if(pump)
   {
     pump->connect(ip);
@@ -152,7 +153,8 @@ void PandaControlLoop<cm, ShowNetworkWarnings>::updateSensors(mc_control::MCGlob
   auto & robot = controller.controller().robots().robot(name_);
   using GC = mc_control::MCGlobalController;
   using set_sensor_t = void (GC::*)(const std::string &, const std::vector<double> &);
-  auto updateSensor = [&controller, &robot, this](set_sensor_t set_sensor, const std::array<double, 7> & data) {
+  auto updateSensor = [&controller, &robot, this](set_sensor_t set_sensor, const std::array<double, 7> & data)
+  {
     assert(sensorsBuffer_.size() == 7);
     std::memcpy(sensorsBuffer_.data(), data.data(), 7 * sizeof(double));
     (controller.*set_sensor)(robot.name(), sensorsBuffer_);
@@ -192,33 +194,35 @@ void PandaControlLoop<cm, ShowNetworkWarnings>::controlThread(mc_control::MCGlob
     startCV.wait(lock, [&]() { return start; });
   }
   auto start_t = clock::now();
-  control_.control(
-      robot_,
-      [&, this](const franka::RobotState & stateIn, franka::Duration dt) -> typename PandaControlType<cm>::ReturnT {
-        std::unique_lock<std::mutex> ctlLock(updateControlMutex_);
-        std::unique_lock<std::mutex> senLock(updateSensorsMutex_);
-        auto now = clock::now();
-        delay_ = duration_ms(now - start_t).count();
-        start_t = now;
-        state_ = stateIn;
-        sensor_id_ += dt.toMSec();
-        if(sensor_id_ % steps_ == 0)
-        {
-          if(ShowNetworkWarnings && control_id_ != prev_control_id_ + dt.toMSec())
-          {
-            mc_rtc::log::warning("[mc_franka] {} missed control data (previous: {}, current: {}, expected: {}", name_,
-                                 prev_control_id_, control_id_, prev_control_id_ + dt.toMSec());
-          }
-          prev_control_id_ = control_id_;
-        }
-        if(running)
-        {
-          logger_.log();
-          auto & robot = controller.controller().robots().robot(name_);
-          return control_.update(robot, command_, sensor_id_ % steps_, steps_);
-        }
-        return franka::MotionFinished(control_);
-      });
+  control_.control(robot_,
+                   [&, this](const franka::RobotState & stateIn, franka::Duration dt) ->
+                   typename PandaControlType<cm>::ReturnT
+                   {
+                     std::unique_lock<std::mutex> ctlLock(updateControlMutex_);
+                     std::unique_lock<std::mutex> senLock(updateSensorsMutex_);
+                     auto now = clock::now();
+                     delay_ = duration_ms(now - start_t).count();
+                     start_t = now;
+                     state_ = stateIn;
+                     sensor_id_ += dt.toMSec();
+                     if(sensor_id_ % steps_ == 0)
+                     {
+                       if(ShowNetworkWarnings && control_id_ != prev_control_id_ + dt.toMSec())
+                       {
+                         mc_rtc::log::warning("[mc_franka] {} missed control data (previous: {}, current: "
+                                              "{}, expected: {}",
+                                              name_, prev_control_id_, control_id_, prev_control_id_ + dt.toMSec());
+                       }
+                       prev_control_id_ = control_id_;
+                     }
+                     if(running)
+                     {
+                       logger_.log();
+                       auto & robot = controller.controller().robots().robot(name_);
+                       return control_.update(robot, command_, sensor_id_ % steps_, steps_);
+                     }
+                     return franka::MotionFinished(control_);
+                   });
 }
 
 } // namespace mc_franka

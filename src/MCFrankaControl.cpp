@@ -1,11 +1,11 @@
 /* Copyright 2020 mc_rtc development team */
 
-#include "PandaControlLoop.h"
-
 #include <mc_panda/devices/Pump.h>
 #include <mc_panda/devices/Robot.h>
 
 #include <boost/program_options.hpp>
+
+#include "PandaControlLoop.h"
 namespace po = boost::program_options;
 
 namespace mc_franka
@@ -47,7 +47,9 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   }
   size_t n_steps = std::ceil(controller.controller().timeStep / 0.001);
   size_t freq = std::ceil(1 / controller.controller().timeStep);
-  mc_rtc::log::info("[mc_franka] mc_rtc running at {}Hz, will interpolate every {} panda control step", freq, n_steps);
+  mc_rtc::log::info("[mc_franka] mc_rtc running at {}Hz, will interpolate every {} panda "
+                    "control step",
+                    freq, n_steps);
   auto & robots = controller.controller().robots();
   // Initialize all real robots
   for(size_t i = controller.realRobots().size(); i < robots.size(); ++i)
@@ -75,27 +77,30 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
       if(frankaConfig.has(robot.name()))
       {
         std::string ip = frankaConfig(robot.name())("ip");
-        panda_init_threads.emplace_back([&, ip]() {
-          {
-            std::unique_lock<std::mutex> lock(pandas_init_mutex);
-            pandas_init_cv.wait(lock, [&pandas_init_ready]() { return pandas_init_ready; });
-          }
-          auto pump = mc_panda::Pump::get(robot);
-          auto & device = *mc_panda::Robot::get(robot);
-          auto panda = std::unique_ptr<PandaControlLoop<cm, ShowNetworkWarnings>>(
-              new PandaControlLoop<cm, ShowNetworkWarnings>(robot.name(), ip, n_steps, device, pump));
-          device.addToLogger(controller.controller().logger(), robot.name());
-          if(pump)
-          {
-            pump->addToLogger(controller.controller().logger(), robot.name());
-          }
-          std::unique_lock<std::mutex> lock(pandas_init_mutex);
-          pandas.emplace_back(std::move(panda));
-        });
+        panda_init_threads.emplace_back(
+            [&, ip]()
+            {
+              {
+                std::unique_lock<std::mutex> lock(pandas_init_mutex);
+                pandas_init_cv.wait(lock, [&pandas_init_ready]() { return pandas_init_ready; });
+              }
+              auto pump = mc_panda::Pump::get(robot);
+              auto & device = *mc_panda::Robot::get(robot);
+              auto panda = std::unique_ptr<PandaControlLoop<cm, ShowNetworkWarnings>>(
+                  new PandaControlLoop<cm, ShowNetworkWarnings>(robot.name(), ip, n_steps, device, pump));
+              device.addToLogger(controller.controller().logger(), robot.name());
+              if(pump)
+              {
+                pump->addToLogger(controller.controller().logger(), robot.name());
+              }
+              std::unique_lock<std::mutex> lock(pandas_init_mutex);
+              pandas.emplace_back(std::move(panda));
+            });
       }
       else
       {
-        mc_rtc::log::warning("The loaded controller uses an actuated robot that is not configured and not ignored: {}",
+        mc_rtc::log::warning("The loaded controller uses an actuated robot that is not "
+                             "configured and not ignored: {}",
                              robot.name());
       }
     }
@@ -125,41 +130,43 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   }
   startControl = true;
   startCV.notify_all();
-  loop_data->controller_run = new std::thread([loop_data]() {
-    auto controller_ptr = loop_data->controller;
-    auto & controller = *controller_ptr;
-    auto & pandas = *loop_data->pandas;
-    std::mutex controller_run_mtx;
-    timespec tv;
-    clock_gettime(CLOCK_REALTIME, &tv);
-    // Current time in milliseconds
-    double current_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6;
-    // Will record the time that passed between two runs
-    double elapsed_t = 0;
-    controller.controller().logger().addLogEntry("mc_franka_delay", [&elapsed_t]() { return elapsed_t; });
-    while(controller.running)
-    {
-      std::unique_lock lck(controller_run_mtx);
-      loop_data->controller_run_cv.wait(lck);
-      clock_gettime(CLOCK_REALTIME, &tv);
-      elapsed_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6 - current_t;
-      current_t = elapsed_t + current_t;
-      // Update from panda sensors
-      for(auto & panda : pandas)
+  loop_data->controller_run = new std::thread(
+      [loop_data]()
       {
-        panda->updateSensors(controller);
-      }
-      // Run the controller
-      controller.run();
-      // Update panda commands
-      for(auto & panda : pandas)
-      {
-        panda->updateControl(controller);
-      }
-    }
-  });
+        auto controller_ptr = loop_data->controller;
+        auto & controller = *controller_ptr;
+        auto & pandas = *loop_data->pandas;
+        std::mutex controller_run_mtx;
+        timespec tv;
+        clock_gettime(CLOCK_REALTIME, &tv);
+        // Current time in milliseconds
+        double current_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6;
+        // Will record the time that passed between two runs
+        double elapsed_t = 0;
+        controller.controller().logger().addLogEntry("mc_franka_delay", [&elapsed_t]() { return elapsed_t; });
+        while(controller.running)
+        {
+          std::unique_lock lck(controller_run_mtx);
+          loop_data->controller_run_cv.wait(lck);
+          clock_gettime(CLOCK_REALTIME, &tv);
+          elapsed_t = tv.tv_sec * 1000 + tv.tv_nsec * 1e-6 - current_t;
+          current_t = elapsed_t + current_t;
+          // Update from panda sensors
+          for(auto & panda : pandas)
+          {
+            panda->updateSensors(controller);
+          }
+          // Run the controller
+          controller.run();
+          // Update panda commands
+          for(auto & panda : pandas)
+          {
+            panda->updateControl(controller);
+          }
+        }
+      });
 #ifndef WIN32
-#ifdef USE_REALTIME
+#  ifdef USE_REALTIME
   // Lower thread priority so that it has a lesser priority than the real time
   // thread
   auto th_handle = loop_data->controller_run->native_handle();
@@ -169,11 +176,11 @@ void * global_thread_init(mc_control::MCGlobalController::GlobalConfiguration & 
   param.sched_priority = 99;
   if(pthread_setschedparam(th_handle, SCHED_RR, &param) != 0)
   {
-    mc_rtc::log::warning(
-        "[MCFrankaControl] Failed to lower calibration thread priority. If you are running on a real-time system, "
-        "this might cause latency to the real-time loop.");
+    mc_rtc::log::warning("[MCFrankaControl] Failed to lower calibration thread priority. If you "
+                         "are running on a real-time system, "
+                         "this might cause latency to the real-time loop.");
   }
-#endif
+#  endif
 #endif
   return loop_data;
 }
@@ -199,7 +206,8 @@ void run_impl(void * data)
     auto cycle_start = clock::now();
     control_data->controller_run_cv.notify_one();
 #ifdef USE_REALTIME
-    // Sleep until the next cycle (using the kernel's thread scheduler to ensure better timing)
+    // Sleep until the next cycle (using the kernel's thread scheduler to ensure
+    // better timing)
     sched_yield();
 #else
     // Pause this thread for the remaining time to keep 1ms cycle
@@ -209,7 +217,8 @@ void run_impl(void * data)
     if(elapsed_us < cycle_us)
     {
       auto sleep_ms = static_cast<double>(cycle_us - elapsed_us) / 1000.0;
-      // mc_rtc::log::info("[mc_franka] Using non-realtime interface, yielding until the next iteration by sleeping for {:.4f} ms", sleep_ms);
+      // mc_rtc::log::info("[mc_franka] Using non-realtime interface, yielding
+      // until the next iteration by sleeping for {:.4f} ms", sleep_ms);
       std::this_thread::sleep_for(std::chrono::microseconds(cycle_us - elapsed_us));
     }
 #endif
@@ -278,7 +287,8 @@ void * init(int argc, char * argv[], uint64_t & cycle_ns)
   if(!gconfig.config.has("Franka"))
   {
     mc_rtc::log::error_and_throw<std::runtime_error>(
-        "No Franka section in the configuration, see etc/sample.yaml for an example");
+        "No Franka section in the configuration, see etc/sample.yaml for an "
+        "example");
   }
   auto frankaConfig = gconfig.config("Franka");
   ControlMode cm = frankaConfig("ControlMode", ControlMode::Velocity);

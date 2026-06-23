@@ -98,7 +98,7 @@ If this implementation is useful for your research, please cite the related publ
 
 ```
 @INPROCEEDINGS{Dehio2021ICRA,
-  title={Robot-Safe Impacts with Soft Contacts Based on Learned Deformations}, 
+  title={Robot-Safe Impacts with Soft Contacts Based on Learned Deformations},
   author={Dehio, Niels and Kheddar, Abderrahmane},
   booktitle={IEEE Int. Conf. on Robotics and Automation},
   pages={1357-1363},
