@@ -1,8 +1,9 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.22)
 
+set(CMAKE_CXX_VERSION 17)
 project(mc_franka LANGUAGES CXX VERSION 1.0.0)
 
-option(USE_REALTIME "Enable real-time scheduling (requires setcap)" ON)
+option(USE_REALTIME "Enable real-time scheduling (requires setcap)" OFF)
 
 if(USE_REALTIME)
   find_program(SETCAP setcap)
