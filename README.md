@@ -6,21 +6,56 @@ mc_franka
 
 Interface between [libfranka] and [mc_rtc]. It provides multi-robot support and connect [mc_panda] devices to their [libfranka] counterpart.
 
-Dependencies
-------------
+## Setup
+### Nix
+#### Building with Nix
+
+To build the software, simply use
+
+```bash
+nix build .#mc-franka
+```
+
+### Developping
+
+To develop, use
+
+```bash
+nix develop .#mc-rtc-superbuild-mc-franka-devel
+```
+
+This will give you a shell with `mc_rtc` configured to use the `mc_panda` and `mc_panda_lirmm` robots, and `mc_franka` built from source. Follow the instructions in the terminal.
+
+### Running
+
+You can use the `mc-rtc-superbuild-mc-franka-devel` environment where you compiled `mc_franka` yourself, or if you simply want to let Nix build and run the software:
+
+- Step 1: create a suitable `mc_franka` configuration for your robot in an `mc_rtc.yaml` file (please refer to `Usage` section).
+
+```bash
+nix develop .#mc-rtc-superbuild-mc-franka # or -devel
+# Run the gui in the background
+(mc-rtc-magnum &)
+# By default mc_rtc_ticker will use the configuration provided by `MC_RTC_CONTROLLER_CONFIG` env variable. This is set by the mc-rtc-superbuild derivation and devShell to contain all needed runtime depencencies and optionally a default controller's configuration
+MCFrankaControl -f mc_rtc.yaml
+```
+
+### From source
+#### Dependencies
 
 This package requires:
 - [mc_panda]
+- [mc_rtc]
 
-You will also need the `linux-libc-dev` package on Ubuntu and Debian systems.
+You will also need the `linux-libc-dev` package on Ubuntu and Debian systems. To build and install the software:
 
-Usage
---
+1. Install this project's dependencies
+1. Install this project (`cmake`/`make`/`make install`)
+
+## Usage
 
 1. Make sure the system is [setup properly to work with the robot](https://frankaemika.github.io/docs/getting_started.html#verifying-the-connection)
-2. Install this project's dependencies
-3. Install this project (`cmake`/`make`/`make install`)
-4. Make sure your user account has sufficient memory limits
+1. Make sure your user account has sufficient memory limits
 
 For that last point, you want to edit `/etc/security/limits.conf` and add the following line:
 
@@ -98,7 +133,7 @@ If this implementation is useful for your research, please cite the related publ
 
 ```
 @INPROCEEDINGS{Dehio2021ICRA,
-  title={Robot-Safe Impacts with Soft Contacts Based on Learned Deformations}, 
+  title={Robot-Safe Impacts with Soft Contacts Based on Learned Deformations},
   author={Dehio, Niels and Kheddar, Abderrahmane},
   booktitle={IEEE Int. Conf. on Robotics and Automation},
   pages={1357-1363},

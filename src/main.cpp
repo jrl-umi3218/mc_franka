@@ -21,13 +21,12 @@ int sched_setattr(pid_t pid, const struct sched_attr * attr, unsigned int flags)
 
 int main(int argc, char * argv[])
 {
-
-uint64_t cycle_ns = 1 * 1000 * 1000; // 1 ms default cycle
-char * MC_RT_FREQ = nullptr;
-if((MC_RT_FREQ = getenv("MC_RT_FREQ")) != nullptr)
-{
-  cycle_ns = atoi(MC_RT_FREQ) * 1000 * 1000;
-}
+  uint64_t cycle_ns = 1 * 1000 * 1000; // 1 ms default cycle
+  char * MC_RT_FREQ = nullptr;
+  if((MC_RT_FREQ = getenv("MC_RT_FREQ")) != nullptr)
+  {
+    cycle_ns = atoi(MC_RT_FREQ) * 1000 * 1000;
+  }
 
 #ifdef USE_REALTIME
   struct sched_attr attr;
@@ -37,7 +36,8 @@ if((MC_RT_FREQ = getenv("MC_RT_FREQ")) != nullptr)
     printf("mlockall failed: %m\n");
     if(errno == ENOMEM)
     {
-      printf("\nIt is likely your user does not have enough memory limits, you can change the limits by adding the "
+      printf("\nIt is likely your user does not have enough memory limits, you "
+             "can change the limits by adding the "
              "following line to /etc/security/limits.conf:\n\n");
       printf("%s - memlock 1000000000\n\n", getlogin());
       printf("Then log-in and log-out\n");
@@ -59,7 +59,6 @@ if((MC_RT_FREQ = getenv("MC_RT_FREQ")) != nullptr)
     return -2;
   }
 
-
 #ifdef USE_REALTIME
   /* Time reservation */
   attr.sched_policy = SCHED_DEADLINE;
@@ -74,7 +73,10 @@ if((MC_RT_FREQ = getenv("MC_RT_FREQ")) != nullptr)
     return -2;
   }
 #else
-  printf("[mc_franka] Running non real-time thread at %fms per cycle. Cycle time is not guaranteed and the control thread might not wake up consistently. If possible, prefer using a real-time kernel.\n", cycle_ns / 1e6);
+  printf("[mc_franka] Running non real-time thread at %fms per cycle. Cycle time "
+         "is not guaranteed and the control thread might not wake up "
+         "consistently. If possible, prefer using a real-time kernel.\n",
+         cycle_ns / 1e6);
 #endif
 
   /* Run */

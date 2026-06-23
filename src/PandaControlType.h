@@ -2,10 +2,9 @@
 
 #pragma once
 
-#include <mc_rbdyn/Robot.h>
-
 #include <franka/exception.h>
 #include <franka/robot.h>
+#include <mc_rbdyn/Robot.h>
 
 #include "ControlMode.h"
 
