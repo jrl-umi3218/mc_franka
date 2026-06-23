@@ -16,15 +16,12 @@
         imports = [
           inputs.mc-rtc-nix.flakeModule
           {
+            mc-rtc-nix = {
+              with-ros = false;
+            };
+
             flakoboros = {
-              enableQt = false;
-              rosDistros = [ "jazzy" ];
-              overlays = [
-                (_final: _: {
-                  qt6.qtbase = null;
-                  qt6.wrapQtAppsHook = null;
-                })
-              ];
+              rosDistros = [ ];
 
               overrideAttrs.libfranka =
                 { pkgs-final, ... }:
