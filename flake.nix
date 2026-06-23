@@ -41,6 +41,22 @@
                   cmakeFlags = drv-prev.cmakeFlags ++ [ "-DUSE_REALTIME=OFF" ];
                   src = lib.cleanSource ./.;
                 };
+              overrideAttrs.poco =
+                { pkgs-final, ... }:
+                {
+                  # Force falling back to c++17
+                  # postPatch = ''
+                  #   substituteInPlace CMakeLists.txt \
+                  #     --replace "if(CXX20_COMPILER)" "if(FALSE)"
+                  # '';
+
+                  src = pkgs-final.fetchFromGitHub {
+                    owner = "pocoproject";
+                    repo = "poco";
+                    hash = "sha256-koREkrfAHWfpqITN5afiXwZg37Wve2Ftx8sr8t2bSV4=";
+                    rev = "poco-1.14.2-release";
+                  };
+                };
             };
 
             # This mc-rtc-superbuild configuration will:
