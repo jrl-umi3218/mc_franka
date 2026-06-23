@@ -1,23 +1,27 @@
 /* Copyright 2020 mc_rtc development team */
 
-#include <errno.h>
-#include <linux/sched.h>
-#include <linux/sched/types.h>
+#ifdef USE_REALTIME
+#  include <errno.h>
+#  include <linux/sched.h>
+#  include <linux/sched/types.h>
+#  include <string.h>
+#  include <sys/mman.h>
+#  include <sys/types.h>
+#  include <syscall.h>
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <syscall.h>
 #include <unistd.h>
 
 #include "thread.h"
 
+#ifdef USE_REALTIME
 int sched_setattr(pid_t pid, const struct sched_attr * attr, unsigned int flags)
 {
   return syscall(__NR_sched_setattr, pid, attr, flags);
 }
+#endif
 
 int main(int argc, char * argv[])
 {
