@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 
 set(CMAKE_CXX_VERSION 17)
+# ensure it doesn't allow features to drop:
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(mc_franka LANGUAGES CXX VERSION 1.0.0)
 
 option(USE_REALTIME "Enable real-time scheduling (requires setcap)" OFF)

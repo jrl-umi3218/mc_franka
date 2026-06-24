@@ -5,6 +5,7 @@
     mc-rtc-nix.url = "github:mc-rtc/nixpkgs";
     flake-parts.follows = "mc-rtc-nix/flake-parts";
     systems.follows = "mc-rtc-nix/systems";
+    mc-panda.url = "github:jrl-umi3218/mc_panda/pull/17/head";
   };
 
   outputs =
@@ -41,21 +42,20 @@
                   cmakeFlags = drv-prev.cmakeFlags ++ [ "-DUSE_REALTIME=OFF" ];
                   src = lib.cleanSource ./.;
                 };
+              overrideAttrs.mc-panda = {
+                src = inputs.mc-panda;
+              };
               overrideAttrs.poco =
                 { pkgs-final, ... }:
                 {
-                  # Force falling back to c++17
-                  # postPatch = ''
-                  #   substituteInPlace CMakeLists.txt \
-                  #     --replace "if(CXX20_COMPILER)" "if(FALSE)"
-                  # '';
-
+                  version = "1.14.2";
                   src = pkgs-final.fetchFromGitHub {
                     owner = "pocoproject";
                     repo = "poco";
                     hash = "sha256-koREkrfAHWfpqITN5afiXwZg37Wve2Ftx8sr8t2bSV4=";
                     rev = "poco-1.14.2-release";
                   };
+                  doCheck = !pkgs-final.stdenv.hostPlatform.isDarwin;
                 };
             };
 
