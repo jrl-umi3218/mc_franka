@@ -26,6 +26,17 @@
                 })
               ];
 
+              overrideAttrs.libfranka =
+                { pkgs-final, ... }:
+                {
+                  src = pkgs-final.fetchgit {
+                    url = "https://github.com/jrl-umi3218/libfranka";
+                    rev = "f3bbab62bfbbd64a59cf35d427199963630d5506";
+                    hash = "sha256-AvAOY9DbzcoOHqvkfL7ADXICX40t+ke+zkunPVcEzVE=";
+                    fetchSubmodules = true;
+                  };
+                  patches = [ ];
+                };
               overrideAttrs.mc-franka =
                 { pkgs-final, drv-prev, ... }:
                 {
