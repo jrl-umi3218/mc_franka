@@ -3,10 +3,9 @@
 #include <mc_panda/devices/Pump.h>
 #include <mc_panda/devices/Robot.h>
 
-#include <boost/program_options.hpp>
+#include <CLI/CLI.hpp>
 
 #include "PandaControlLoop.h"
-namespace po = boost::program_options;
 
 namespace mc_franka
 {
@@ -265,22 +264,17 @@ void run(void * data)
 void * init(int argc, char * argv[], uint64_t & cycle_ns)
 {
   std::string conf_file = "";
-  po::options_description desc("MCFrankaControl options");
-  // clang-format off
-  desc.add_options()
-    ("help", "Display help message")
-    ("conf,f", po::value<std::string>(&conf_file), "Configuration file");
-  // clang-format on
 
-  po::variables_map vm;
-  po::store(po::parse_command_line(argc, argv, desc), vm);
-  po::notify(vm);
-
-  if(vm.count("help"))
+  CLI::App app{"MCFrankaControl options"};
+  app.footer("see etc/sample.yaml for libfranka configuration");
+  app.add_option("-f,--conf", conf_file, "Configuration file");
+  try
   {
-    std::cout << desc << "\n";
-    std::cout << "see etc/sample.yaml for libfranka configuration\n";
-    return nullptr;
+    app.parse(argc, argv);
+  }
+  catch(const CLI::ParseError & e)
+  {
+    return reinterpret_cast<void *>(app.exit(e));
   }
 
   mc_control::MCGlobalController::GlobalConfiguration gconfig(conf_file, nullptr);
@@ -290,9 +284,11 @@ void * init(int argc, char * argv[], uint64_t & cycle_ns)
         "No Franka section in the configuration, see etc/sample.yaml for an "
         "example");
   }
+
   auto frankaConfig = gconfig.config("Franka");
   ControlMode cm = frankaConfig("ControlMode", ControlMode::Velocity);
   bool ShowNetworkWarnings = frankaConfig("ShowNetworkWarnings", true);
+
   try
   {
     switch(cm)

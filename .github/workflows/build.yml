@@ -3,7 +3,7 @@ name: CI of mc_franka
 on:
   push:
     branches:
-      - '**'
+      - master
   pull_request:
     branches:
       - '**'
