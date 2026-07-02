@@ -5,6 +5,7 @@
     mc-rtc-nix.url = "github:mc-rtc/nixpkgs";
     flake-parts.follows = "mc-rtc-nix/flake-parts";
     systems.follows = "mc-rtc-nix/systems";
+    mc-panda.url = "github:jrl-umi3218/mc_panda/pull/17/head";
   };
 
   outputs =
@@ -16,15 +17,12 @@
         imports = [
           inputs.mc-rtc-nix.flakeModule
           {
+            mc-rtc-nix = {
+              with-ros = false;
+            };
+
             flakoboros = {
-              enableQt = false;
-              rosDistros = [ "jazzy" ];
-              overlays = [
-                (_final: _: {
-                  qt6.qtbase = null;
-                  qt6.wrapQtAppsHook = null;
-                })
-              ];
+              rosDistros = [ ];
 
               overrideAttrs.libfranka =
                 { pkgs-final, ... }:
@@ -43,6 +41,21 @@
                   nativeBuildInputs = [ pkgs-final.cmake ];
                   cmakeFlags = drv-prev.cmakeFlags ++ [ "-DUSE_REALTIME=OFF" ];
                   src = lib.cleanSource ./.;
+                };
+              overrideAttrs.mc-panda = {
+                src = inputs.mc-panda;
+              };
+              overrideAttrs.poco =
+                { pkgs-final, ... }:
+                {
+                  version = "1.14.2";
+                  src = pkgs-final.fetchFromGitHub {
+                    owner = "pocoproject";
+                    repo = "poco";
+                    hash = "sha256-koREkrfAHWfpqITN5afiXwZg37Wve2Ftx8sr8t2bSV4=";
+                    rev = "poco-1.14.2-release";
+                  };
+                  doCheck = !pkgs-final.stdenv.hostPlatform.isDarwin;
                 };
             };
 
