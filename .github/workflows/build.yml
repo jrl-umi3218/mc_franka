@@ -3,7 +3,7 @@ name: CI of mc_franka
 on:
   push:
     branches:
-      - '**'
+      - master
   pull_request:
     branches:
       - '**'
@@ -11,46 +11,35 @@ on:
     # Run on Sunday, Tuesday and Thursday nights
     - cron: '0 23 * * 0,1,4'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04]
+        os: [ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v7
       with:
         submodules: recursive
-    - name: Install ROS dependencies
+    - name: Setup ROS 2 apt repository
       run: |
-        set -x
-        set -e
-        if [ "${{ matrix.os }}" = "ubuntu-18.04" ]
-        then
-          export ROS_DISTRO="melodic"
-        else
-          export ROS_DISTRO="noetic"
-        fi
-        sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
-        wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
-        sudo apt-get update -qq
-        sudo apt-get -qq remove libomp5-9 || true
-        sudo apt-get install -qq ros-${ROS_DISTRO}-libfranka ros-${ROS_DISTRO}-franka-ros
-        . /opt/ros/${ROS_DISTRO}/setup.bash
-        echo "ROS_DISTRO=${ROS_DISTRO}" >> $GITHUB_ENV
-        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> $GITHUB_ENV
-        echo "ROS_MASTER_URI=${ROS_MASTER_URI}" >> $GITHUB_ENV
-        echo "ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}" >> $GITHUB_ENV
-        echo "PYTHONPATH=${PYTHONPATH}" >> $GITHUB_ENV
-        echo "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "PATH=${PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        sudo apt-get update && sudo apt-get install -y curl gnupg lsb-release
+        sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+        sudo apt-get update
+        # Setup ROS 2 library paths for linking
+        echo "LD_LIBRARY_PATH=/opt/ros/humble/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=/opt/ros/humble:$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
     - name: Install mc_rtc
       run: |
         set -x
         set -e
         curl -1sLf 'https://dl.cloudsmith.io/public/mc-rtc/head/setup.deb.sh' | sudo -E bash
-        sudo apt-get install -qq libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-${ROS_DISTRO}-mc-rtc-plugin mc-openrtm jvrc-choreonoid libcnoid-dev
+        sudo apt-get install -qq libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-humble-mc-rtc-plugin ros-humble-ament-index-cpp libfranka-dev
     - name: Install mc_panda
       uses: jrl-umi3218/github-actions/install-dependencies@master
       with:

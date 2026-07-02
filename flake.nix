@@ -19,12 +19,6 @@
             flakoboros = {
               enableQt = false;
               rosDistros = [ "jazzy" ];
-              overlays = [
-                (_final: _: {
-                  qt6.qtbase = null;
-                  qt6.wrapQtAppsHook = null;
-                })
-              ];
 
               overrideAttrs.libfranka =
                 { pkgs-final, ... }:
@@ -40,6 +34,7 @@
               overrideAttrs.mc-franka =
                 { pkgs-final, drv-prev, ... }:
                 {
+                  buildInputs = (drv-prev.buildInputs or [ ]) ++ [ pkgs-final.cli11 ];
                   nativeBuildInputs = [ pkgs-final.cmake ];
                   cmakeFlags = drv-prev.cmakeFlags ++ [ "-DUSE_REALTIME=OFF" ];
                   src = lib.cleanSource ./.;
