@@ -36,7 +36,16 @@ jobs:
         set -x
         set -e
         curl -1sLf 'https://dl.cloudsmith.io/public/mc-rtc/head/setup.deb.sh' | sudo -E bash
-        sudo apt-get install -qq libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-humble-mc-rtc-plugin ros-humble-ament-index-cpp libfranka-dev
+        sudo apt-get install -qq libmc-rtc-dev mc-rtc-utils python3-mc-rtc ros-humble-mc-rtc-plugin ros-humble-ament-index-cpp python3-ament-package libfranka-dev
+        source /opt/ros/humble/setup.bash
+        echo "ROS_DISTRO=${ROS_DISTRO}" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> $GITHUB_ENV
+        echo "ROS_MASTER_URI=${ROS_MASTER_URI}" >> $GITHUB_ENV
+        echo "ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}" >> $GITHUB_ENV
+        echo "PYTHONPATH=${PYTHONPATH}" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "PATH=${PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> $GITHUB_ENV       source /opt/ros/humble/setup.bash
     - name: Install mc_panda
       uses: jrl-umi3218/github-actions/install-dependencies@master
       with:
