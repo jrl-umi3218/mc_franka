@@ -34,7 +34,7 @@
               overrideAttrs.mc-franka =
                 { pkgs-final, drv-prev, ... }:
                 {
-                  buildInputs = (drv-prev.buildInputs or []) ++ [ pkgs-final.cli11 ];
+                  buildInputs = (drv-prev.buildInputs or [ ]) ++ [ pkgs-final.cli11 ];
                   nativeBuildInputs = [ pkgs-final.cmake ];
                   cmakeFlags = drv-prev.cmakeFlags ++ [ "-DUSE_REALTIME=OFF" ];
                   src = lib.cleanSource ./.;
