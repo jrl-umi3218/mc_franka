@@ -35,8 +35,24 @@ if(USE_REALTIME)
     endif()
 endif()
 
-find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(mc_panda REQUIRED) # brings Franka and mc_rtc
+
+# Try to find system CLI11 first
+find_package(CLI11 CONFIG QUIET)
+if(NOT CLI11_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        cli11_proj
+        QUIET
+        GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+        GIT_TAG v2.5.0
+    )
+    FetchContent_MakeAvailable(cli11_proj)
+    # Alias target for compatibility if needed
+    if(NOT TARGET CLI11::CLI11 AND TARGET cli11)
+        add_library(CLI11::CLI11 ALIAS cli11)
+    endif()
+endif()
 
 set(MCFrankaControl_SRC
     src/ControlMode.h
@@ -51,11 +67,8 @@ set(MCFrankaControl_SRC
 add_executable(MCFrankaControl ${MCFrankaControl_SRC})
 target_link_libraries(
     MCFrankaControl
-    PUBLIC
-        mc_rtc::mc_control
-        Franka::Franka
-        Boost::program_options
-        mc_panda::devices
+    PUBLIC mc_rtc::mc_control Franka::Franka mc_panda::devices
+    PRIVATE CLI11::CLI11
 )
 # CAP_SYS_NICE is required to set the SCHED_DEADLINE policy, we set it on the generated executable and the installed one
 set(JOB_POOL_OPTION)
