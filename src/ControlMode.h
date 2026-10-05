@@ -14,7 +14,7 @@ enum class ControlMode
   Velocity,
   Torque
 };
-}
+} // namespace mc_franka
 
 namespace mc_rtc
 {
